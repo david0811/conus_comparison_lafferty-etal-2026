@@ -61,10 +61,12 @@ def plot_total_uncertainty(
     ax.text(
         xtext,
         ytext,
-        f"(All {len(unique_combos)} projections)",
+        f"Entire meta-ensemble ({len(unique_combos)} simulations)",
         horizontalalignment="right",
         transform=ax.transAxes,
     )
+    if ylims is not None:
+        ax.set_ylim(ylims)
 
     # Legend
     legend_elements = [
@@ -134,6 +136,18 @@ def plot_scenario_uncertainty(
         y=var_id, label="SSP2-4.5", lw=2, ax=ax, color=ssp245_color
     )
 
+    # Get unique combos for legend
+    unique_combos = (
+        pd.concat(
+            [
+                df_ssp245[["gcm", "member", "ssp"]].drop_duplicates(),
+                df_ssp585[["gcm", "member", "ssp"]].drop_duplicates(),
+            ]
+        )
+        .drop_duplicates()
+        .reset_index(drop=True)
+    )
+
     # Tidy
     ax.set_xlabel("")
     ax.set_ylabel(f"{pu.title_labels[metric_id]} anomaly {unit}")
@@ -141,7 +155,7 @@ def plot_scenario_uncertainty(
     ax.text(
         xtext,
         ytext,
-        f"({ensemble})",
+        f"{ensemble} ({len(unique_combos)})",
         horizontalalignment="right",
         transform=ax.transAxes,
     )
@@ -216,6 +230,18 @@ def plot_response_uncertainty(
         y=var_id, label=gcm2, lw=2, ax=ax
     )
 
+    # Get unique combos
+    unique_combos = (
+        pd.concat(
+            [
+                df_gcm1[["gcm", "member"]].drop_duplicates(),
+                df_gcm2[["gcm", "member"]].drop_duplicates(),
+            ]
+        )
+        .drop_duplicates()
+        .reset_index(drop=True)
+    )
+
     # Tidy
     ax.set_xlabel("")
     ax.set_ylabel(f"{pu.title_labels[metric_id]} anomaly {unit}")
@@ -223,7 +249,7 @@ def plot_response_uncertainty(
     ax.text(
         xtext,
         ytext,
-        f"({ensemble}, {ssp_name})",
+        f"{ensemble}, {ssp_name} ({len(unique_combos)})",
         horizontalalignment="right",
         transform=ax.transAxes,
     )
@@ -273,6 +299,11 @@ def plot_internal_variability(
         color="gray", label=gcm, lw=2, ax=ax
     )
 
+    # Get unique combos
+    unique_combos = (
+        df_gcm[["gcm", "member", "ssp"]].drop_duplicates().reset_index(drop=True)
+    )
+
     # Tidy
     ax.set_xlabel("")
     ax.set_ylabel(f"{pu.title_labels[metric_id]} anomaly {unit}")
@@ -280,7 +311,7 @@ def plot_internal_variability(
     ax.text(
         xtext,
         ytext,
-        f"({ensemble}, {ssp_name})",
+        f"{ensemble}, {ssp_name} ({len(unique_combos)})",
         horizontalalignment="right",
         transform=ax.transAxes,
     )
@@ -347,7 +378,7 @@ def plot_downscaling_uncertainty(
     ax.text(
         xtext,
         ytext,
-        f"({gcm}, {member}, {ssp_name})",
+        f"{gcm}, {member}, {ssp_name} (2)",
         horizontalalignment="right",
         transform=ax.transAxes,
     )
@@ -508,7 +539,7 @@ def plot_gev_uncertainty(
     ax.text(
         xtext,
         ytext,
-        f"({ensemble}, {gcm}, {member}, {ssp_name})",
+        f"{ensemble}, {gcm}, {member}, {ssp_name} (1)",
         horizontalalignment="right",
         transform=ax.transAxes,
     )
@@ -522,6 +553,7 @@ def plot_gev_uncertainty(
 def make_figure(
     city,
     metric_id,
+    ylims=None,
     plot_anomalies=True,
     save_fig=True,
 ):
@@ -593,11 +625,13 @@ def make_figure(
         gridspec_kw={"hspace": 0.075, "wspace": 0.01},
     )
 
-    plot_total_uncertainty(df_plot, metric_id, unit, axs[0, 0])
-    plot_scenario_uncertainty(df_plot, metric_id, unit, axs[0, 1])
-    plot_response_uncertainty(df_plot, metric_id, unit, axs[1, 0])
-    plot_internal_variability(df_plot, metric_id, unit, axs[1, 1])
-    plot_downscaling_uncertainty(df_plot, metric_id, unit, axs[2, 0], member="r4i1p1f1")
+    plot_total_uncertainty(df_plot, metric_id, unit, axs[0, 0], ylims=ylims)
+    plot_scenario_uncertainty(df_plot, metric_id, unit, axs[0, 1], ylims=ylims)
+    plot_response_uncertainty(df_plot, metric_id, unit, axs[1, 0], ylims=ylims)
+    plot_internal_variability(df_plot, metric_id, unit, axs[1, 1], ylims=ylims)
+    plot_downscaling_uncertainty(
+        df_plot, metric_id, unit, axs[2, 0], member="r4i1p1f1", ylims=ylims
+    )
 
     baseline = df[
         (df["ensemble"] == "STAR-ESDM")
@@ -617,10 +651,15 @@ def make_figure(
         gcm="CanESM5",
         member="r1i1p1f1",
         anomaly_baseline=baseline,
+        ylims=ylims,
     )
 
+    if city == "nyc":
+        city_name = "New York, NY, USA"
+    else:
+        city_name = pu.city_names[city]
     fig.suptitle(
-        f"Examples of uncertainty sources: change in annual maximum temperature in {pu.city_names[city]}",
+        f"Examples of uncertainty sources: change in annual maximum temperature in {city_name}",
         fontweight="bold",
         fontsize=14,
         y=1.03,

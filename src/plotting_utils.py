@@ -1,6 +1,7 @@
 import cartopy.crs as ccrs
 import cartopy.feature as cfeature
 import cartopy.io.shapereader as shpreader
+import matplotlib.gridspec as gridspec
 import matplotlib.pyplot as plt
 import matplotlib.ticker as mticker
 import matplotlib.transforms as transforms
@@ -94,6 +95,11 @@ trend_labels_abs = {
     "sum_pr": "[mm/decade]",
     "sum_cdd": "[degree days/decade]",
     "sum_hdd": "[degree days/decade]",
+    "max_tasmax": "[°C/decade]",
+    "max_cdd": "[degree days/decade]",
+    "max_hdd": "[degree days/decade]",
+    "max_pr": "[mm/decade]",
+    "min_tasmin": "[°C/decade]",
 }
 trend_labels_rel = {
     "avg_tas": "[%/decade]",
@@ -645,7 +651,13 @@ def plot_ensemble_mean_uncertainty(
         subfigs = fig.subfigures(1, 3, width_ratios=[0.4, 1, 0.4])
         idm_start = 1
     else:
-        subfigs = fig.subfigures(1, len(plot_metric_ids))
+        gs = gridspec.GridSpec(2, 4, figure=fig, hspace=0.06)
+
+        sfA = fig.add_subfigure(gs[0, :2])
+        sfB = fig.add_subfigure(gs[0, 2:])
+        sfC = fig.add_subfigure(gs[1, 1:3])
+        subfigs = [sfA, sfB, sfC]
+        # subfigs = fig.subfigures(1, len(plot_metric_ids))
         idm_start = 0
         if len(plot_metric_ids) == 1:
             subfigs = [subfigs]
@@ -728,7 +740,8 @@ def plot_ensemble_mean_uncertainty(
             if metric_id in ["max_pr", "sum_pr"]:
                 cmap = devon_map
             else:
-                cmap = "Blues_r" if "min" in metric_id else lajolla_map
+                # cmap = "Blues_r" if "min" in metric_id else lajolla_map
+                cmap = lajolla_map
 
         # Cbar label
         if rel and analysis_type == "trends":
@@ -894,7 +907,8 @@ def plot_ensemble_ssp_means(
         if metric_id in ["max_pr", "sum_pr"]:
             cmap = devon_map
         else:
-            cmap = "Blues_r" if "min" in metric_id else lajolla_map
+            # cmap = "Blues_r" if "min" in metric_id else lajolla_map
+            cmap = lajolla_map
 
     # Loop through quantiles
     for idq, quantile in enumerate(["q01", "mean", "q99"]):
@@ -1063,13 +1077,14 @@ def plot_ensemble_mean_uq(
         b_subfigs = [b_subfigs]
 
     subfigs[1].suptitle(uncertainty_title, fontweight="bold", y=b_y_title)
+
     for idp, metric_id in enumerate(plot_metric_ids):
         if len(plot_metric_ids) == 3:
             axs = b_subfigs[idp].subplots(
                 1,
-                7,
+                5 if plot_fit_uc else 4,
                 subplot_kw=dict(projection=ccrs.LambertConformal()),
-                width_ratios=[0.65, 1, 1, 1, 1, 1, 0.65],
+                # width_ratios=[0.65, 1, 1, 1, 1, 1, 0.65],
             )
         else:
             axs = b_subfigs[idp].subplots(
@@ -1095,16 +1110,17 @@ def plot_ensemble_mean_uq(
             y_title=b_y_titles,
             title=subplot_labels[idp],
             fig=b_subfigs[idp],
-            axs=axs[1:-1] if len(plot_metric_ids) == 3 else axs,
+            # axs=axs[1:-1] if len(plot_metric_ids) == 3 else axs,
+            axs=axs,
             plot_fit_uc=plot_fit_uc,
             plot_total_uc=False,
             x_title=x_title,
             fs=fs,
         )
-        if len(plot_metric_ids) == 3:
-            # Remove first and last axes (for spacing)
-            axs[0].remove()
-            axs[-1].remove()
+        # if len(plot_metric_ids) == 3:
+        #     # Remove first and last axes (for spacing)
+        #     axs[0].remove()
+        #     axs[-1].remove()
 
     # Create a new axes for the colorbar at the bottom
     cbar_ax = subfigs[1].add_axes(cbar_ax)  # [left, bottom, width, height]

@@ -40,7 +40,7 @@ def plot_dataset_comparison(
     ds_nclim,
     data_var,
     unit,
-    figsize=(10, 9),
+    figsize=(10, 10),
     cmap="viridis",
     diff_cmap="RdBu_r",
     diff_lim=20,
