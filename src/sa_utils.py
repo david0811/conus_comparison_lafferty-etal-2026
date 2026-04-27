@@ -2,6 +2,7 @@ from glob import glob
 
 import numpy as np
 import xarray as xr
+from fastnanquantile import xrcompat
 
 from utils import roar_data_path as project_data_path
 
@@ -452,20 +453,42 @@ def ensemble_gcm_range(ds, min_members, var_name):
     return gcm_range.where(gcm_range != 0.0)
 
 
+def ensemble_gcm_range95(ds, min_members, var_name):
+    """
+    GCM uncertainty: 95% range across forced responses
+    """
+    combos_to_include = ds[var_name].count(dim=["member"]) >= min_members
+    ds_forced = ds[var_name].mean(dim="member").where(combos_to_include)
+    # gcm_range95 = ds_forced.quantile([0.025, 0.975], dim="gcm").diff(dim="quantile").squeeze(dim="quantile", drop=True)
+    gcm_range95 = (
+        xrcompat.xr_apply_nanquantile(ds_forced, q=[0.025, 0.975], dim="gcm")
+        .diff(dim="quantile")
+        .squeeze(dim="quantile", drop=True)
+    )
+    return gcm_range95.where(gcm_range95 != 0.0).compute(scheduler="threads")
+
+
 def compute_gcm_uc(ds_loca, ds_gard, ds_star, var_name, min_members=5):
     """
     Compute GCM uncertainty
     """
     # Compute for individual ensembles
-    loca_gcm_range = ensemble_gcm_range(ds_loca, min_members, var_name)
-    star_gcm_range = ensemble_gcm_range(ds_star, min_members, var_name)
-    gard_gcm_range = ensemble_gcm_range(ds_gard, min_members, var_name)
+    loca_gcm_range = ensemble_gcm_range95(ds_loca, min_members, var_name)
+    # star_gcm_range = ensemble_gcm_range95(ds_star, min_members, var_name)
+    gard_gcm_range = ensemble_gcm_range95(ds_gard, min_members, var_name)
 
     # Combine and average over SSPs, ensembles
     # Note: due to the regridding, there are some gridpoints where the
     # range is computed across only 1 ensemble, so we filter any below
     # the maximum count
-    gcm_uc = xr.concat([gard_gcm_range, star_gcm_range, loca_gcm_range], dim="ensemble")
+    gcm_uc = xr.concat(
+        [
+            gard_gcm_range,
+            # star_gcm_range,
+            loca_gcm_range,
+        ],
+        dim="ensemble",
+    )
     uq_maxs = (
         gcm_uc.count(dim=["ensemble", "ssp"])
         == gcm_uc.count(dim=["ensemble", "ssp"]).max()
@@ -484,6 +507,20 @@ def ensemble_ssp_range(ds, var_name):
     return ssp_range.where(ssp_range != 0.0)
 
 
+def ensemble_ssp_range95(ds, var_name):
+    """
+    SSP uncertainty: 95% range across ensemble means
+    """
+    ensemble_mean = ds[var_name].mean(dim=["member", "gcm"])
+    # ssp_range95 = ensemble_mean.quantile([0.025, 0.975], dim="ssp").diff(dim="quantile").squeeze(dim="quantile", drop=True)
+    ssp_range95 = (
+        xrcompat.xr_apply_nanquantile(ensemble_mean, q=[0.025, 0.975], dim="ssp")
+        .diff(dim="quantile")
+        .squeeze(dim="quantile", drop=True)
+    )
+    return ssp_range95.where(ssp_range95 != 0.0).compute(scheduler="threads")
+
+
 def ensemble_ssp_range_by_gcm(ds, var_name, min_members=5):
     """
     SSP uncertainty: range across forced responses for each GCM
@@ -494,23 +531,45 @@ def ensemble_ssp_range_by_gcm(ds, var_name, min_members=5):
     return ssp_range.where(ssp_range != 0.0)
 
 
+def ensemble_ssp_range95_by_gcm(ds, var_name, min_members=5):
+    """
+    SSP uncertainty: 95% range across forced responses for each GCM
+    """
+    combos_to_include = ds[var_name].count(dim=["member"]) >= min_members
+    ensemble_mean = ds[var_name].mean(dim=["member"]).where(combos_to_include)
+    # ssp_range95 = ensemble_mean.quantile([0.025, 0.975], dim="ssp").diff(dim="quantile").squeeze(dim="quantile", drop=True)
+    ssp_range95 = (
+        xrcompat.xr_apply_nanquantile(ensemble_mean, q=[0.025, 0.975], dim="ssp")
+        .diff(dim="quantile")
+        .squeeze(dim="quantile", drop=True)
+    )
+    return ssp_range95.where(ssp_range95 != 0.0).compute(scheduler="threads")
+
+
 def compute_ssp_uc(ds_loca, ds_gard, ds_star, var_name, by_gcm=False):
     """
     Compute SSP uncertainty
     """
     # Compute for individual ensembles
     if by_gcm:
-        loca_ssp_range = ensemble_ssp_range_by_gcm(ds_loca, var_name)
-        star_ssp_range = ensemble_ssp_range_by_gcm(ds_star, var_name)
-        gard_ssp_range = ensemble_ssp_range_by_gcm(ds_gard, var_name)
+        loca_ssp_range = ensemble_ssp_range95_by_gcm(ds_loca, var_name)
+        star_ssp_range = ensemble_ssp_range95_by_gcm(ds_star, var_name)
+        # gard_ssp_range = ensemble_ssp_range95_by_gcm(ds_gard, var_name)
     else:
-        loca_ssp_range = ensemble_ssp_range(ds_loca, var_name)
-        star_ssp_range = ensemble_ssp_range(ds_star, var_name)
-        gard_ssp_range = ensemble_ssp_range(ds_gard, var_name)
+        loca_ssp_range = ensemble_ssp_range95(ds_loca, var_name)
+        star_ssp_range = ensemble_ssp_range95(ds_star, var_name)
+        # gard_ssp_range = ensemble_ssp_range95(ds_gard, var_name)
 
     # Combine and average over ensembles
     # Again filter due to regridding issues
-    ssp_uc = xr.concat([loca_ssp_range, star_ssp_range, gard_ssp_range], dim="ensemble")
+    ssp_uc = xr.concat(
+        [
+            loca_ssp_range,
+            star_ssp_range,
+            # gard_ssp_range
+        ],
+        dim="ensemble",
+    )
     uq_maxs = ssp_uc.count(dim="ensemble") == ssp_uc.count(dim="ensemble").max()
     if by_gcm:
         ssp_uc = ssp_uc.where(uq_maxs).mean(dim=["ensemble", "gcm"])
@@ -531,17 +590,45 @@ def ensemble_iv_range(ds, min_members, var_name):
     return iv_range.where(iv_range != 0.0)
 
 
+def ensemble_iv_range95(ds, min_members, var_name):
+    """
+    Internal variability uncertainty: 95% range across members
+    """
+    combos_to_include = ds[var_name].count(dim=["member"]) >= min_members
+    # iv_range95 = (
+    #     ds[var_name]
+    #     .where(combos_to_include)
+    #     .quantile([0.025, 0.975], dim="member")
+    #     .diff(dim="quantile").squeeze(dim="quantile", drop=True)
+    # )
+    iv_range95 = (
+        xrcompat.xr_apply_nanquantile(
+            ds[var_name].where(combos_to_include), q=[0.025, 0.975], dim="member"
+        )
+        .diff(dim="quantile")
+        .squeeze(dim="quantile", drop=True)
+    )
+    return iv_range95.where(iv_range95 != 0.0).compute(scheduler="threads")
+
+
 def compute_iv_uc(ds_loca, ds_gard, ds_star, var_name, min_members=5):
     """
     Compute internal variability uncertainty
     """
     # Compute for individual ensembles
-    loca_iv_range = ensemble_iv_range(ds_loca, min_members, var_name)
-    star_iv_range = ensemble_iv_range(ds_star, min_members, var_name)
-    gard_iv_range = ensemble_iv_range(ds_gard, min_members, var_name)
+    loca_iv_range = ensemble_iv_range95(ds_loca, min_members, var_name)
+    # star_iv_range = ensemble_iv_range95(ds_star, min_members, var_name)
+    gard_iv_range = ensemble_iv_range95(ds_gard, min_members, var_name)
 
     # Combine and average over ensembles
-    iv_uc = xr.concat([gard_iv_range, star_iv_range, loca_iv_range], dim="ensemble")
+    iv_uc = xr.concat(
+        [
+            gard_iv_range,
+            # star_iv_range,
+            loca_iv_range,
+        ],
+        dim="ensemble",
+    )
     # There are 19 GCM-SSPs total with > 5 members, so require at least 10 to estimates
     # of internal variability uncertainty (at each gridpoint) to calculate the average.
     # After checking, vasty majority of gridpoints have all (some issues with min_tasmin over
@@ -595,25 +682,37 @@ def compute_dsc_uc(ds_loca, ds_gard, ds_star, var_name):
     ds_combined = xr.merge(
         [
             xr.combine_by_coords(
-                [ds, ds_star], join="left", combine_attrs="drop_conflicts"
+                [ds, ds_star.load()], join="left", combine_attrs="drop_conflicts"
             ),
             xr.combine_by_coords(
-                [ds, ds_gard], join="left", combine_attrs="drop_conflicts"
+                [ds, ds_gard.load()], join="left", combine_attrs="drop_conflicts"
             ),
             xr.combine_by_coords(
-                [ds, ds_loca], join="left", combine_attrs="drop_conflicts"
+                [ds, ds_loca.load()], join="left", combine_attrs="drop_conflicts"
             ),
         ],
         combine_attrs="drop_conflicts",
     )
 
-    # Downscaling uncertainty
-    dsc_uc = ds_combined.max(dim="ensemble") - ds_combined.min(dim="ensemble")
-    # Filter at least 2 ensembles
+    # # Downscaling uncertainty
+    # dsc_uc = ds_combined.max(dim="ensemble") - ds_combined.min(dim="ensemble")
+    # # Filter at least 2 ensembles
+    # dsc_uc = (
+    #     dsc_uc[var_name]
+    #     .where(ds_combined[var_name].count(dim="ensemble") > 1)
+    #     .mean(dim=["gcm", "ssp", "member"])
+    # )
+    # Downscaling uncertainty -- 95% range
+    # dsc_uc = ds_combined.quantile([0.025, 0.975], dim="ensemble").diff(dim="quantile").squeeze(dim="quantile", drop=True)
     dsc_uc = (
-        dsc_uc[var_name]
-        .where(ds_combined[var_name].count(dim="ensemble") > 1)
-        .mean(dim=["gcm", "ssp", "member"])
+        xrcompat.xr_apply_nanquantile(
+            ds_combined[var_name], q=[0.025, 0.975], dim="ensemble"
+        )
+        .diff(dim="quantile")
+        .squeeze(dim="quantile", drop=True)
+    )
+    dsc_uc = dsc_uc.where(ds_combined[var_name].count(dim="ensemble") > 1).mean(
+        dim=["gcm", "ssp", "member"]
     )
 
     return dsc_uc
@@ -621,7 +720,7 @@ def compute_dsc_uc(ds_loca, ds_gard, ds_star, var_name):
 
 def ensemble_fit_range(ds, var_name):
     """
-    Fit uncertainty: 95% range
+    Fit uncertainty: 95 % range
     """
     fit_range = ds[var_name].sel(quantile="q975") - ds[var_name].sel(quantile="q025")
     return fit_range.where(fit_range != 0.0)
@@ -670,9 +769,9 @@ def compute_tot_uc_main(ds_loca, ds_gard, ds_star, var_name):
     # Stack along new dimension
     ds_stacked = xr.concat(
         [
-            ds_loca[var_name].stack(z=("ensemble", "gcm", "ssp", "member")),
-            ds_star[var_name].stack(z=("ensemble", "gcm", "ssp", "member")),
-            ds_gard[var_name].stack(z=("ensemble", "gcm", "ssp", "member")),
+            ds_loca[var_name].stack(z=("ensemble", "gcm", "ssp", "member")).load(),
+            ds_star[var_name].stack(z=("ensemble", "gcm", "ssp", "member")).load(),
+            ds_gard[var_name].stack(z=("ensemble", "gcm", "ssp", "member")).load(),
         ],
         dim="z",
     )
@@ -682,52 +781,84 @@ def compute_tot_uc_main(ds_loca, ds_gard, ds_star, var_name):
         ds_stacked = ds_stacked.sel(quantile="main")
 
     # Measures of uncertainty
-    uc_99w = ds_stacked.quantile(0.995, dim="z") - ds_stacked.quantile(0.005, dim="z")
+    # uc_99w = (
+    #     ds_stacked
+    #     .quantile([0.005, 0.995], dim="z")
+    #     .diff(dim="quantile").squeeze(dim="quantile", drop=True)
+    # ).compute(scheduler="threads")
+    uc_99w = (
+        xrcompat.xr_apply_nanquantile(
+            ds_stacked,
+            q=[0.005, 0.995],
+            dim="z",
+        )
+        .diff(dim="quantile")
+        .squeeze(dim="quantile", drop=True)
+        .compute(scheduler="threads")
+    )
+    uc_95w = (
+        xrcompat.xr_apply_nanquantile(
+            ds_stacked,
+            q=[0.025, 0.975],
+            dim="z",
+        )
+        .diff(dim="quantile")
+        .squeeze(dim="quantile", drop=True)
+        .compute(scheduler="threads")
+    )
+    # uc_95w = (
+    #     ds_stacked
+    #     .quantile([0.025, 0.975], dim="z")
+    #     .diff(dim="quantile").squeeze(dim="quantile", drop=True)
+    # ).compute(scheduler="threads")
+
     uc_range = ds_stacked.max(dim="z") - ds_stacked.min(dim="z")
 
-    return uc_99w, uc_range
+    return uc_99w, uc_95w, uc_range
 
 
-def compute_tot_uc_bootstrap(ds_loca, ds_gard, ds_star, var_name):
-    """
-    Computes total uncertainty (full range).
-    Need to do via stacking a new dimension since we can't merge all.
-    """
-    # Average of upper/lower quantiles
-    ds_upper = xr.concat(
-        [
-            ds_loca[var_name]
-            .sel(quantile="q975")
-            .stack(z=("ensemble", "gcm", "ssp", "member")),
-            ds_star[var_name]
-            .sel(quantile="q975")
-            .stack(z=("ensemble", "gcm", "ssp", "member")),
-            ds_gard[var_name]
-            .sel(quantile="q975")
-            .stack(z=("ensemble", "gcm", "ssp", "member")),
-        ],
-        dim="z",
-    )
+# def compute_tot_uc_bootstrap(ds_loca, ds_gard, ds_star, var_name):
+#     """
+#     Computes total uncertainty (full range).
+#     Need to do via stacking a new dimension since we can't merge all.
+#     """
+#     # Average of upper/lower quantiles
+#     ds_upper = xr.concat(
+#         [
+#             ds_loca[var_name]
+#             .sel(quantile="q975")
+#             .stack(z=("ensemble", "gcm", "ssp", "member")),
+#             ds_star[var_name]
+#             .sel(quantile="q975")
+#             .stack(z=("ensemble", "gcm", "ssp", "member")),
+#             ds_gard[var_name]
+#             .sel(quantile="q975")
+#             .stack(z=("ensemble", "gcm", "ssp", "member")),
+#         ],
+#         dim="z",
+#     )
 
-    ds_lower = xr.concat(
-        [
-            ds_loca[var_name]
-            .sel(quantile="q025")
-            .stack(z=("ensemble", "gcm", "ssp", "member")),
-            ds_star[var_name]
-            .sel(quantile="q025")
-            .stack(z=("ensemble", "gcm", "ssp", "member")),
-            ds_gard[var_name]
-            .sel(quantile="q025")
-            .stack(z=("ensemble", "gcm", "ssp", "member")),
-        ],
-        dim="z",
-    )
+#     ds_lower = xr.concat(
+#         [
+#             ds_loca[var_name]
+#             .sel(quantile="q025")
+#             .stack(z=("ensemble", "gcm", "ssp", "member")),
+#             ds_star[var_name]
+#             .sel(quantile="q025")
+#             .stack(z=("ensemble", "gcm", "ssp", "member")),
+#             ds_gard[var_name]
+#             .sel(quantile="q025")
+#             .stack(z=("ensemble", "gcm", "ssp", "member")),
+#         ],
+#         dim="z",
+#     )
 
-    # Measures of uncertainty
-    uc_99w = ds_upper.quantile(0.995, dim="z") - ds_lower.quantile(0.005, dim="z")
+#     # Measures of uncertainty
+#     uc_99w = ds_upper.quantile(0.995, dim="z") - ds_lower.quantile(0.005, dim="z")
+#     uc_95w = ds_upper.quantile(0.975, dim="z") - ds_lower.quantile(0.025, dim="z")
+#     uc_range = ds_upper.max(dim="z") - ds_lower.min(dim="z")
 
-    return uc_99w
+#     return uc_99w, uc_95w, uc_range
 
 
 def uc_all(
@@ -773,9 +904,26 @@ def uc_all(
         _preprocess_func=_preprocess_func_main,
     )
 
-    # For some reason quantile is not present in some
+    # For consistency
     if "quantile" not in ds_star.dims:
         ds_star = ds_star.expand_dims({"quantile": ["main"]})
+
+    # Drop quantile dim and rechunk
+    ds_loca = (
+        ds_loca.sel(quantile="main")
+        .drop_vars("quantile")
+        .chunk({"lat": 50, "lon": 100, "ssp": -1, "gcm": -1, "member": -1})
+    )
+    ds_star = (
+        ds_star.sel(quantile="main")
+        .drop_vars("quantile")
+        .chunk({"lat": 50, "lon": 100, "ssp": -1, "gcm": -1, "member": -1})
+    )
+    ds_gard = (
+        ds_gard.sel(quantile="main")
+        .drop_vars("quantile")
+        .chunk({"lat": 50, "lon": 100, "ssp": -1, "gcm": -1, "member": -1})
+    )
 
     # Filter values if desired
     if filter_vals is not None:
@@ -806,6 +954,7 @@ def uc_all(
 
     # Compute SSP uncertainty
     ssp_uc = compute_ssp_uc(ds_loca, ds_gard, ds_star, col_name_main)
+
     ssp_uc_by_gcm = compute_ssp_uc(
         ds_loca, ds_gard, ds_star, col_name_main, by_gcm=True
     )
@@ -817,12 +966,13 @@ def uc_all(
     dsc_uc = compute_dsc_uc(ds_loca, ds_gard, ds_star, col_name_main)
 
     # Compute total uncertainty
-    uc_99w_main, uc_range_main = compute_tot_uc_main(
+    uc_99w_main, uc_95w_main, uc_range_main = compute_tot_uc_main(
         ds_loca, ds_gard, ds_star, col_name_main
     )
+
     if not include_fit_uc:
         fit_uc = xr.zeros_like(uc_99w_main)
-        uc_99w_boot = xr.zeros_like(uc_99w_main)
+        # uc_99w_boot = xr.zeros_like(uc_99w_main)
 
     del ds_loca, ds_star, ds_gard  # memory management
 
@@ -850,8 +1000,8 @@ def uc_all(
         # Compute fit uncertainty
         fit_uc = compute_fit_uc(ds_loca, ds_gard, ds_star, col_name_boot)
 
-        # Compute total uncertainty
-        uc_99w_boot = compute_tot_uc_bootstrap(ds_loca, ds_gard, ds_star, col_name_boot)
+        # # Compute total uncertainty
+        # uc_99w_boot = compute_tot_uc_bootstrap(ds_loca, ds_gard, ds_star, col_name_boot)
 
     uc = xr.merge(
         [
@@ -862,8 +1012,9 @@ def uc_all(
             dsc_uc.rename("dsc_uc"),
             fit_uc.rename("fit_uc"),
             uc_99w_main.rename("uc_99w_main"),
+            uc_95w_main.rename("uc_95w_main"),
             uc_range_main.rename("uc_range_main"),
-            uc_99w_boot.rename("uc_99w_boot"),
+            # uc_99w_boot.rename("uc_99w_boot"),
         ]
     )
 
@@ -941,20 +1092,31 @@ def summary_stats_main(
             ds_star = ds_star - ds_star.sel(ssp="historical")
             ds_star = ds_star.drop_sel(ssp="historical")
 
+    # For xrcompat
+    ds_loca = ds_loca[col_name]
+    ds_gard = ds_gard[col_name]
+    ds_star = ds_star[col_name]
+
     return xr.concat(
         [
             xr.concat(
                 [
                     ds_loca.mean(dim=["gcm", "member"]).assign_coords(quantile="mean"),
-                    ds_loca.median(dim=["gcm", "member"]).assign_coords(
-                        quantile="median"
-                    ),
-                    ds_loca.quantile(0.01, dim=["gcm", "member"]).assign_coords(
-                        quantile="q01"
-                    ),
-                    ds_loca.quantile(0.99, dim=["gcm", "member"]).assign_coords(
-                        quantile="q99"
-                    ),
+                    xrcompat.xr_apply_nanquantile(
+                        ds_loca, q=0.5, dim=["gcm", "member"]
+                    ).assign_coords(quantile="median"),
+                    xrcompat.xr_apply_nanquantile(
+                        ds_loca, q=0.01, dim=["gcm", "member"]
+                    ).assign_coords(quantile="q01"),
+                    xrcompat.xr_apply_nanquantile(
+                        ds_loca, q=0.025, dim=["gcm", "member"]
+                    ).assign_coords(quantile="q025"),
+                    xrcompat.xr_apply_nanquantile(
+                        ds_loca, q=0.975, dim=["gcm", "member"]
+                    ).assign_coords(quantile="q975"),
+                    xrcompat.xr_apply_nanquantile(
+                        ds_loca, q=0.99, dim=["gcm", "member"]
+                    ).assign_coords(quantile="q99"),
                 ],
                 dim="quantile",
                 coords="minimal",
@@ -962,15 +1124,21 @@ def summary_stats_main(
             xr.concat(
                 [
                     ds_gard.mean(dim=["gcm", "member"]).assign_coords(quantile="mean"),
-                    ds_gard.median(dim=["gcm", "member"]).assign_coords(
-                        quantile="median"
-                    ),
-                    ds_gard.quantile(0.01, dim=["gcm", "member"]).assign_coords(
-                        quantile="q01"
-                    ),
-                    ds_gard.quantile(0.99, dim=["gcm", "member"]).assign_coords(
-                        quantile="q99"
-                    ),
+                    xrcompat.xr_apply_nanquantile(
+                        ds_gard, q=0.5, dim=["gcm", "member"]
+                    ).assign_coords(quantile="median"),
+                    xrcompat.xr_apply_nanquantile(
+                        ds_gard, q=0.01, dim=["gcm", "member"]
+                    ).assign_coords(quantile="q01"),
+                    xrcompat.xr_apply_nanquantile(
+                        ds_gard, q=0.025, dim=["gcm", "member"]
+                    ).assign_coords(quantile="q025"),
+                    xrcompat.xr_apply_nanquantile(
+                        ds_gard, q=0.975, dim=["gcm", "member"]
+                    ).assign_coords(quantile="q975"),
+                    xrcompat.xr_apply_nanquantile(
+                        ds_gard, q=0.99, dim=["gcm", "member"]
+                    ).assign_coords(quantile="q99"),
                 ],
                 dim="quantile",
                 coords="minimal",
@@ -981,12 +1149,18 @@ def summary_stats_main(
                     ds_star.median(dim=["gcm", "member"]).assign_coords(
                         quantile="median"
                     ),
-                    ds_star.quantile(0.01, dim=["gcm", "member"]).assign_coords(
-                        quantile="q01"
-                    ),
-                    ds_star.quantile(0.99, dim=["gcm", "member"]).assign_coords(
-                        quantile="q99"
-                    ),
+                    xrcompat.xr_apply_nanquantile(
+                        ds_star, q=0.01, dim=["gcm", "member"]
+                    ).assign_coords(quantile="q01"),
+                    xrcompat.xr_apply_nanquantile(
+                        ds_star, q=0.025, dim=["gcm", "member"]
+                    ).assign_coords(quantile="q025"),
+                    xrcompat.xr_apply_nanquantile(
+                        ds_star, q=0.975, dim=["gcm", "member"]
+                    ).assign_coords(quantile="q975"),
+                    xrcompat.xr_apply_nanquantile(
+                        ds_star, q=0.99, dim=["gcm", "member"]
+                    ).assign_coords(quantile="q99"),
                 ],
                 dim="quantile",
                 coords="minimal",

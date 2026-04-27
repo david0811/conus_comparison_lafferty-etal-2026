@@ -8,7 +8,7 @@ import matplotlib.transforms as transforms
 import numpy as np
 import pandas as pd
 import xarray as xr
-from matplotlib.colors import LinearSegmentedColormap
+from matplotlib.colors import BoundaryNorm, LinearSegmentedColormap, ListedColormap
 from matplotlib.lines import Line2D
 
 import sa_city_utils as sacu
@@ -616,6 +616,218 @@ def plot_uc_map(
     return p
 
 
+def plot_uc_rank_map(
+    metric_id,
+    proj_slice,
+    hist_slice,
+    plot_col,
+    return_period,
+    grid,
+    fit_method,
+    stationary,
+    stat_str,
+    time_str,
+    analysis_type,
+    plot_fit_uc=False,
+    regrid_method="nearest",
+    fig=None,
+    axs=None,
+    rel_metric_ids=[],
+    cbar=False,
+    title="",
+    y_title=0.98,
+    x_title=0.05,
+    fs=8,
+    filter_str="",
+):
+    """
+    Plot uncertainty component rank maps for climate metrics across CONUS.
+    """
+    # We can choose to normalize by a specific metric id
+    if metric_id in rel_metric_ids:
+        rel = True
+        rel_str = "_rel"
+    else:
+        rel = False
+        rel_str = ""
+    # Read
+    if analysis_type == "trends":
+        if metric_id == "sum_pr":
+            file_path = f"{project_data_path}/results/{metric_id}{rel_str}_{proj_slice}_{hist_slice}_{plot_col}_{grid}grid_{regrid_method}.nc"
+        else:
+            file_path = f"{project_data_path}/results/{metric_id}{rel_str}_{proj_slice}_{hist_slice}_{plot_col}_{grid}grid_{regrid_method}.nc"
+    elif analysis_type == "extreme_value":
+        if stationary:
+            if time_str is not None:
+                file_path = f"{project_data_path}/results/{metric_id}_{proj_slice}_{hist_slice}_{return_period}yr_return_level_{time_str}_{fit_method}_{stat_str}_{grid}grid_{regrid_method}{filter_str}.nc"
+            else:
+                file_path = f"{project_data_path}/results/{metric_id}_{proj_slice}_{hist_slice}_{return_period}yr_return_level_{fit_method}_{stat_str}_{grid}grid_{regrid_method}{filter_str}.nc"
+        else:
+            file_path = f"{project_data_path}/results/{metric_id}_{proj_slice}_{return_period}yr_return_level_{time_str}_{fit_method}_{stat_str}_{grid}grid_{regrid_method}{filter_str}.nc"
+    elif analysis_type == "averages":
+        var_id = metric_id.split("_")[1]
+        file_path = f"{project_data_path}/results/{metric_id}_{proj_slice}_{hist_slice}_{var_id}_{grid}grid_{regrid_method}{filter_str}.nc"
+
+    uc = xr.open_dataset(file_path)
+
+    # Mask out locations without all three ensembles
+    mask = uc.to_array().sum(dim="variable", skipna=False) >= 0.0
+    uc = uc.where(mask, drop=True)
+
+    if axs is None:
+        ncols = 4 if analysis_type == "averages" else 5
+        width = 8 if analysis_type == "averages" else 12
+        fig, axs = plt.subplots(
+            1,
+            ncols,
+            figsize=(width, 3),
+            layout="constrained",
+            subplot_kw=dict(projection=ccrs.LambertConformal()),
+        )
+
+    # Get ranks
+    uc_list = list(uc_labels.keys())
+    if not plot_fit_uc:
+        uc_list.remove("fit_uc")
+    uc_ranks = (-uc[uc_list].to_array(dim="uc_type")).rank(dim="uc_type")
+    n_ranks = len(uc_list)
+    colors = ["#A8AB50", "#FFE83D", "#A9D3D2", "#24477D", "#5A917C"]
+    cmap = ListedColormap(colors)
+    norm = BoundaryNorm([0.5, 1.5, 2.5, 3.5, 4.5, 5.5], ncolors=5)
+    cmap = plt.get_cmap("Set2", n_ranks)
+
+    # Loop through uncertainties
+    for axi, uc_type in enumerate(uc_list):
+        if not plot_fit_uc and uc_type == "fit_uc":
+            continue
+        ax = axs[axi]
+        p = uc_ranks.sel(uc_type=uc_type).plot(
+            ax=ax,
+            add_colorbar=False,
+            cmap=cmap,
+            # norm=norm,
+            levels=np.arange(n_ranks + 1) + 0.5,
+            transform=ccrs.PlateCarree(),
+        )
+
+        # Tidy
+        tidy_ax_conus(ax)
+        ax.set_extent([-120, -73, 22, 51], ccrs.Geodetic())
+        ax.set_title(uc_labels[uc_type], fontsize=12)
+        # Add spatial average
+        avg = uc_ranks.sel(uc_type=uc_type).mean(dim=["lat", "lon"], skipna=True).item()
+        ax.text(
+            0.125,
+            0.1,
+            f"{avg:.2f}",
+            transform=ax.transAxes,
+            ha="center",
+            va="center",
+            fontsize=fs,
+            bbox=dict(boxstyle="round", fc="silver", alpha=0.7),
+        )
+
+    # Cbar
+    if cbar:
+        fig.colorbar(
+            p,
+            orientation="horizontal",
+            label="Rank",
+            ax=axs,
+            pad=0.05,
+            shrink=0.3,
+        )
+
+    if title is not None:
+        if title in [
+            "",
+            "a)",
+            "b)",
+            "c)",
+            "d)",
+            "e)",
+            "i)",
+            "ii)",
+            "iii)",
+            "iv)",
+            "v)",
+            "vi)",
+        ]:
+            fig.suptitle(
+                f"{title} {title_labels[metric_id]}",
+                style="italic",
+                y=y_title,
+                x=x_title,
+                ha="left",
+            )
+        else:
+            fig.suptitle(title, style="italic", y=y_title, x=x_title, ha="left")
+
+    return p
+
+
+def plot_uc_rank_maps(
+    plot_metric_ids,
+    proj_slice,
+    hist_slice,
+    stationary,
+    plot_col="100yr_return_level",
+    return_period=100,
+    grid="LOCA2",
+    fit_method="mle",
+    stat_str="nonstat_scale",
+    analysis_type="extreme_value",
+    time_str="diff_2075-1975",
+    plot_fit_uc=True,
+    title=None,
+    store_path=None,
+    figsize=(10, 6),
+):
+    fig = plt.figure(figsize=figsize, layout="constrained")
+    subfigs = fig.subfigures(len(plot_metric_ids), 1, hspace=0.01)
+    fig.suptitle(title, fontweight="bold", y=1.07)
+
+    n_cols = 5 if plot_fit_uc else 4
+    subplot_kw = dict(projection=ccrs.LambertConformal())
+
+    for idp, metric_id in enumerate(plot_metric_ids):
+        axs = subfigs[idp].subplots(1, n_cols, subplot_kw=subplot_kw)
+        p = plot_uc_rank_map(
+            metric_id=metric_id,
+            proj_slice=proj_slice,
+            hist_slice=hist_slice,
+            plot_col=plot_col,
+            return_period=return_period,
+            grid=grid,
+            fit_method=fit_method,
+            stationary=stationary,
+            stat_str=stat_str,
+            time_str=time_str,
+            rel_metric_ids=[],
+            analysis_type=analysis_type,
+            plot_fit_uc=plot_fit_uc,
+            y_title=1.05,
+            fig=subfigs[idp],
+            axs=axs,
+            x_title=0.0,
+            fs=8,
+        )
+
+    cbar_ax = subfigs[-1].add_axes([0.2, 0.01, 0.6, 0.1])
+    cbar = subfigs[-1].colorbar(
+        p,
+        cax=cbar_ax,
+        orientation="horizontal",
+        ticks=np.arange(1, 5.1 if plot_fit_uc else 4.1),
+    )
+    cbar.set_label("Rank")
+
+    if store_path is not None:
+        fig.savefig(store_path, dpi=400, bbox_inches="tight")
+    else:
+        plt.show()
+
+
 def plot_ensemble_mean_uncertainty(
     plot_metric_ids,
     proj_slice,
@@ -650,6 +862,9 @@ def plot_ensemble_mean_uncertainty(
     if narrow_subfigs:
         subfigs = fig.subfigures(1, 3, width_ratios=[0.4, 1, 0.4])
         idm_start = 1
+    elif len(plot_metric_ids) == 2:
+        subfigs = fig.subfigures(1, 2)
+        idm_start = 0
     else:
         gs = gridspec.GridSpec(2, 4, figure=fig, hspace=0.06)
 
@@ -1892,6 +2107,7 @@ def plot_response_rls(
     legend=True,
     idm_start=0,
     y_title=1.05,
+    ylims=None,
     time_str=None,
     xlabel=True,
     xticklabels=True,
@@ -1972,6 +2188,8 @@ def plot_response_rls(
             ax.set_xticklabels(return_periods, fontsize=fontsize)
         else:
             ax.set_xticklabels([])
+        if ylims is not None:
+            ax.set_ylim(ylims)
 
         # Tidy
         ylabel = "Change in return level" if "diff" in time_str else "Return level"

@@ -1,11 +1,11 @@
 import os
 from glob import glob
 
+import cartopy.crs as ccrs
 import dask
 import numpy as np
 import pandas as pd
 import xarray as xr
-import cartopy.crs as ccrs
 
 from utils import city_list, get_unique_loca_metrics, loca_gard_mapping, tgw_scenarios
 from utils import roar_data_path as project_data_path
@@ -256,9 +256,7 @@ def get_city_timeseries_all(
             f"{project_data_path}/metrics/cities/{city}_{metric_id}_neighbors.csv"
         )
     else:
-        store_path = (
-            f"{project_data_path}/metrics/cities/{city}_{metric_id}.csv"
-        )
+        store_path = f"{project_data_path}/metrics/cities/{city}_{metric_id}.csv"
 
     if os.path.exists(store_path):
         return None

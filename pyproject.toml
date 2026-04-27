@@ -31,6 +31,8 @@ dependencies = [
     "xarray-regrid>=0.4.0",
     "xarray>=2024.10.0",
     "salem>=0.3.11",
+    "bottleneck>=1.6.0",
+    "fastnanquantile>=0.0.2",
 ]
 
 [tool.ruff]
