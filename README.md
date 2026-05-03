@@ -4,14 +4,14 @@
 
 *David C. Lafferty<sup>1\*</sup>, Samantha H. Hartke<sup>2,3</sup>, Ryan L. Sriver<sup>4</sup>, Andrew J. Newman<sup>2</sup>, Ethan D. Gutmann<sup>2</sup>, Flavio Lehner<sup>5,6</sup>, Paul A. Ullrich <sup>7,8</sup>, Vivek Srikrishnan<sup>1</sup>*
 
-<sup>1<\sup>Department of Biological \& Environmental Engineering, Cornell University\
-<sup>2<\sup>NSF National Center for Atmospheric Research\
-<sup>3<\sup>Risk Management Center, U.S. Army Corps of Engineers\
-<sup>4<\sup>Department of Climate, Meteorology \& Atmospheric Sciences, University of Illinois Urbana-Champaign\
-<sup>5<\sup>Department of Earth \& Atmospheric Sciences, Cornell University\
-<sup>6<\sup>Polar Bears International\
-<sup>7<\sup>Division of Physical and Life Sciences, Lawrence Livermore National Laboratory\
-<sup>8<\sup>Department of Land, Air, and Water Resources, University of California, Davis
+<sup>1 </sup>Department of Biological \& Environmental Engineering, Cornell University\
+<sup>2 </sup>NSF National Center for Atmospheric Research\
+<sup>3 </sup>Risk Management Center, U.S. Army Corps of Engineers\
+<sup>4 </sup>Department of Climate, Meteorology \& Atmospheric Sciences, University of Illinois Urbana-Champaign\
+<sup>5 </sup>Department of Earth \& Atmospheric Sciences, Cornell University\
+<sup>6 </sup>Polar Bears International\
+<sup>7 </sup>Division of Physical and Life Sciences, Lawrence Livermore National Laboratory\
+<sup>8 </sup>Department of Land, Air, and Water Resources, University of California, Davis
 
 \* corresponding author:  `dcl257@cornell.edu`
 
