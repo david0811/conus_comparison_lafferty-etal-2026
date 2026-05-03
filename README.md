@@ -2,20 +2,21 @@
 
 **Varying sources of uncertainty in risk-relevant hazard projections across the United States**
 
-*David C. Lafferty<sup>1\*</sup>, Samantha H. Hartke<sup>2,3</sup>, Ryan L. Sriver<sup>4</sup>, Andrew J. Newman<sup>2</sup>, Ethan D. Gutmann<sup>2</sup>, Flavio Lehner<sup>2,5</sup>, Paul A. Ullrich <sup>6,7</sup>, Vivek Srikrishnan<sup>1</sup>*
+*David C. Lafferty<sup>1\*</sup>, Samantha H. Hartke<sup>2,3</sup>, Ryan L. Sriver<sup>4</sup>, Andrew J. Newman<sup>2</sup>, Ethan D. Gutmann<sup>2</sup>, Flavio Lehner<sup>5,6</sup>, Paul A. Ullrich <sup>7,8</sup>, Vivek Srikrishnan<sup>1</sup>*
 
-<sup>1 </sup>Department of Biological \& Environmental Engineering, Cornell University\
-<sup>2 </sup>NSF National Center for Atmospheric Research\
-<sup>3 </sup>U.S. Army Corps of Engineers\
-<sup>4 </sup>Department of Climate, Meteorology \& Atmospheric Sciences, University of Illinois\
-<sup>5 </sup>Department of Earth \& Atmospheric Sciences, Cornell University\
-<sup>6 </sup>Division of Physical and Life Sciences, Lawrence Livermore National Laboratory\
-<sup>7 </sup>Department of Land, Air, and Water Resources, University of California, Davis
+<sup>1<\sup>Department of Biological \& Environmental Engineering, Cornell University\
+<sup>2<\sup>NSF National Center for Atmospheric Research\
+<sup>3<\sup>Risk Management Center, U.S. Army Corps of Engineers\
+<sup>4<\sup>Department of Climate, Meteorology \& Atmospheric Sciences, University of Illinois Urbana-Champaign\
+<sup>5<\sup>Department of Earth \& Atmospheric Sciences, Cornell University\
+<sup>6<\sup>Polar Bears International\
+<sup>7<\sup>Division of Physical and Life Sciences, Lawrence Livermore National Laboratory\
+<sup>8<\sup>Department of Land, Air, and Water Resources, University of California, Davis
 
 \* corresponding author:  `dcl257@cornell.edu`
 
 ## Abstract
-Physical climate risk assessment requires understanding how different sources of uncertainty affect hazard projections. However, the relative importance of these uncertainties can differ across end-uses. Here, we combine three state-of-the-art downscaled climate model ensembles to characterize how different uncertainties affect projections of several temperature- and precipitation-based risk metrics across the contiguous United States. We focus on long-term trends of aggregate indices as well as the intensity of rare events with 10- to 100-year return periods. By including new downscaled initial condition ensembles, we characterize the role and relative importance of internal variability at local scales. Our results demonstrate systematic differences in patterns of uncertainty between average and extreme indices, across recurrence intervals, and between temperature- and precipitation-derived metrics. We show that temperature metrics are more sensitive to the choice of emissions scenario and Earth system model, while internal variability can be dominant for precipitation-based metrics. Additionally, we find that the statistical uncertainty from extreme value distribution fitting can often exceed climate-related factors, particularly at recurrence intervals of 50 years or longer. These results highlight the challenge of providing general guidance for climate impacts assessment and the need to consider a wide variety of potential uncertainties when quantifying climate risk.
+Projections of climate hazards carry uncertainty from multiple sources, but their relative importance is poorly characterized for the metrics and spatial scales most relevant to risk assessment. Here, we combine three downscaled climate model ensembles---including downscaled large initial condition ensembles---to characterize how relevant uncertainties affect projections of several temperature- and precipitation-based risk metrics across the contiguous United States. We focus on long-term trends of aggregate indices as well as the intensity of rare events with 10- to 100-year return periods. Our results reveal that uncertainty patterns differ systematically between average and extreme indices, across recurrence intervals, and between temperature- and precipitation-derived metrics. We show that temperature metrics are sensitive to the choice of emissions scenario and Earth system model, while internal variability can dominate for precipitation-based metrics. Uncertainty from downscaling is small for relative changes but considerable for absolute values. Additionally, we find that the parametric uncertainty related to extreme value distribution fits can often exceed climate-related factors, particularly at recurrence intervals of 50 years or longer. These results underscore the difficulty of providing generalized guidance for climate risk assessment and emphasize the need to consider all salient uncertainty sources.
 
 ## Journal reference
 TBD
