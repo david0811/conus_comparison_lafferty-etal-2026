@@ -24,10 +24,11 @@ def plot_total_uncertainty(
 
     # Index
     df_indexed = df.set_index(["gcm", "ssp", "member", "ensemble"]).sort_index()
+    df = df[df['ensemble'] != 'TGW']
     unique_combos = df_indexed.index.unique()
 
     # Plot timeseries
-    for combo in unique_combos[::2]:
+    for combo in unique_combos:
         # Get entries
         gcm, ssp, member, ensemble = combo
         if ssp == "historical":
@@ -61,7 +62,7 @@ def plot_total_uncertainty(
     ax.text(
         xtext,
         ytext,
-        f"Entire meta-ensemble ({len(unique_combos)} simulations)",
+        f"Entire meta-ensemble (467 simulations)",
         horizontalalignment="right",
         transform=ax.transAxes,
     )
