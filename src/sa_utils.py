@@ -1,3 +1,4 @@
+import os
 from glob import glob
 
 import numpy as np
@@ -722,43 +723,27 @@ def ensemble_fit_range(ds, var_name):
     """
     Fit uncertainty: 95 % range
     """
-    fit_range = ds[var_name].sel(quantile="q975") - ds[var_name].sel(quantile="q025")
-    return fit_range.where(fit_range != 0.0)
+    return ds[var_name].sel(quantile="q975") - ds[var_name].sel(quantile="q025")
 
 
 def compute_fit_uc(ds_loca, ds_gard, ds_star, var_name):
     """
     Compute fit uncertainty
     """
-    # Compute for individual ensembles
-    loca_fit_range = ensemble_fit_range(ds_loca, var_name)
-    star_fit_range = ensemble_fit_range(ds_star, var_name)
-    gard_fit_range = ensemble_fit_range(ds_gard, var_name)
-
-    # Combine and average over ensembles
-    # Compute the average 'by hand' to avoid issues with concat memory requirements
-    loca_count = loca_fit_range.count(dim=["gcm", "member", "ssp"])
-    star_count = star_fit_range.count(dim=["gcm", "member", "ssp"])
-    gard_count = gard_fit_range.count(dim=["gcm", "member", "ssp"])
-    total_count = (
-        star_count.isel(ensemble=0)
-        + loca_count.isel(ensemble=0)
-        + gard_count.isel(ensemble=0)
+    # Stack and take median
+    ds_stacked = xr.concat(
+        [
+            ds_loca.stack(z=("ensemble", "gcm", "ssp", "member")),
+            ds_star.stack(z=("ensemble", "gcm", "ssp", "member")),
+            ds_gard.stack(z=("ensemble", "gcm", "ssp", "member")),
+        ],
+        dim="z",
     )
 
-    loca_sum = loca_fit_range.sum(dim=["gcm", "member", "ssp"])
-    star_sum = star_fit_range.sum(dim=["gcm", "member", "ssp"])
-    gard_sum = gard_fit_range.sum(dim=["gcm", "member", "ssp"])
-    total_sum = (
-        star_sum.isel(ensemble=0)
-        + loca_sum.isel(ensemble=0)
-        + gard_sum.isel(ensemble=0)
-    )
+    uc_fit_mean = ensemble_fit_range(ds_stacked, var_name).mean(dim="z")
+    uc_fit_median = ensemble_fit_range(ds_stacked, var_name).median(dim="z")
 
-    # Again filter due to regridding issues
-    fit_uc = (total_sum / total_count).where(total_count > 10)
-
-    return fit_uc
+    return uc_fit_mean, uc_fit_median
 
 
 def compute_tot_uc_main(ds_loca, ds_gard, ds_star, var_name):
@@ -781,11 +766,6 @@ def compute_tot_uc_main(ds_loca, ds_gard, ds_star, var_name):
         ds_stacked = ds_stacked.sel(quantile="main")
 
     # Measures of uncertainty
-    # uc_99w = (
-    #     ds_stacked
-    #     .quantile([0.005, 0.995], dim="z")
-    #     .diff(dim="quantile").squeeze(dim="quantile", drop=True)
-    # ).compute(scheduler="threads")
     uc_99w = (
         xrcompat.xr_apply_nanquantile(
             ds_stacked,
@@ -806,11 +786,6 @@ def compute_tot_uc_main(ds_loca, ds_gard, ds_star, var_name):
         .squeeze(dim="quantile", drop=True)
         .compute(scheduler="threads")
     )
-    # uc_95w = (
-    #     ds_stacked
-    #     .quantile([0.025, 0.975], dim="z")
-    #     .diff(dim="quantile").squeeze(dim="quantile", drop=True)
-    # ).compute(scheduler="threads")
 
     uc_range = ds_stacked.max(dim="z") - ds_stacked.min(dim="z")
 
@@ -872,12 +847,14 @@ def uc_all(
     col_name_boot,
     proj_slice,
     hist_slice,
+    time_name,
     return_metric=False,
     analysis_type="extreme_value",
     rel=False,
     n_boot_proj=100,
     n_boot_hist=1,
     include_fit_uc=True,
+    include_main_uc=True,
     _preprocess_func_main=lambda x: x,
     _preprocess_func_boot=lambda x: x,
     filter_vals=None,
@@ -885,96 +862,104 @@ def uc_all(
     """
     Perform the UC for all.
     """
-    # Read all: main
-    ds_loca, ds_star, ds_gard = read_all(
-        metric_id=metric_id,
-        grid=grid,
-        regrid_method=regrid_method,
-        proj_slice=proj_slice,
-        hist_slice=hist_slice,
-        stationary=stationary,
-        stat_name=stat_name,
-        fit_method=fit_method,
-        bootstrap=False,
-        cols_to_keep=[col_name_main],
-        analysis_type=analysis_type,
-        rel=rel,
-        n_boot_proj=n_boot_proj,
-        n_boot_hist=n_boot_hist,
-        _preprocess_func=_preprocess_func_main,
-    )
+    hist_name = f"_{hist_slice}" if hist_slice is not None else ""
+    rel_str = "_rel" if rel else ""
+    save_path = f"{project_data_path}/results/{metric_id}{rel_str}_{proj_slice}{hist_name}_{col_name_boot}_{time_name}_{fit_method}_{stat_name}_{grid}grid_{regrid_method}.nc"
+    if os.path.exists(save_path):
+        print(f"File already exists at {save_path}, skipping.")
+        return None
 
-    # For consistency
-    if "quantile" not in ds_star.dims:
-        ds_star = ds_star.expand_dims({"quantile": ["main"]})
+    if include_main_uc:
+        # Read all: main
+        ds_loca, ds_star, ds_gard = read_all(
+            metric_id=metric_id,
+            grid=grid,
+            regrid_method=regrid_method,
+            proj_slice=proj_slice,
+            hist_slice=hist_slice,
+            stationary=stationary,
+            stat_name=stat_name,
+            fit_method=fit_method,
+            bootstrap=False,
+            cols_to_keep=[col_name_main],
+            analysis_type=analysis_type,
+            rel=rel,
+            n_boot_proj=n_boot_proj,
+            n_boot_hist=n_boot_hist,
+            _preprocess_func=_preprocess_func_main,
+        )
 
-    # Drop quantile dim and rechunk
-    ds_loca = (
-        ds_loca.sel(quantile="main")
-        .drop_vars("quantile")
-        .chunk({"lat": 50, "lon": 100, "ssp": -1, "gcm": -1, "member": -1})
-    )
-    ds_star = (
-        ds_star.sel(quantile="main")
-        .drop_vars("quantile")
-        .chunk({"lat": 50, "lon": 100, "ssp": -1, "gcm": -1, "member": -1})
-    )
-    ds_gard = (
-        ds_gard.sel(quantile="main")
-        .drop_vars("quantile")
-        .chunk({"lat": 50, "lon": 100, "ssp": -1, "gcm": -1, "member": -1})
-    )
+        # For consistency
+        if "quantile" not in ds_star.dims:
+            ds_star = ds_star.expand_dims({"quantile": ["main"]})
+        if "quantile" not in ds_loca.dims:
+            ds_loca = ds_loca.expand_dims({"quantile": ["main"]})
+        if "quantile" not in ds_gard.dims:
+            ds_gard = ds_gard.expand_dims({"quantile": ["main"]})
 
-    # Filter values if desired
-    if filter_vals is not None:
-        ds_loca = ds_loca.where(ds_loca[col_name_main] >= filter_vals[0])
-        ds_loca = ds_loca.where(ds_loca[col_name_main] <= filter_vals[1])
+        # Drop quantile dim and rechunk
+        ds_loca = (
+            ds_loca.sel(quantile="main")
+            .drop_vars("quantile")
+            .chunk({"lat": 50, "lon": 100, "ssp": -1, "gcm": -1, "member": -1})
+        )
+        ds_star = (
+            ds_star.sel(quantile="main")
+            .drop_vars("quantile")
+            .chunk({"lat": 50, "lon": 100, "ssp": -1, "gcm": -1, "member": -1})
+        )
+        ds_gard = (
+            ds_gard.sel(quantile="main")
+            .drop_vars("quantile")
+            .chunk({"lat": 50, "lon": 100, "ssp": -1, "gcm": -1, "member": -1})
+        )
 
-        ds_gard = ds_gard.where(ds_gard[col_name_main] >= filter_vals[0])
-        ds_gard = ds_gard.where(ds_gard[col_name_main] <= filter_vals[1])
+        # Filter values if desired
+        if filter_vals is not None:
+            ds_loca = ds_loca.where(ds_loca[col_name_main] >= filter_vals[0])
+            ds_loca = ds_loca.where(ds_loca[col_name_main] <= filter_vals[1])
 
-        ds_star = ds_star.where(ds_star[col_name_main] >= filter_vals[0])
-        ds_star = ds_star.where(ds_star[col_name_main] <= filter_vals[1])
+            ds_gard = ds_gard.where(ds_gard[col_name_main] >= filter_vals[0])
+            ds_gard = ds_gard.where(ds_gard[col_name_main] <= filter_vals[1])
 
-    # For the best fit results, future and historical are stored separately
-    # so we need to subtract if change is desired (indicated by hist_slice is not None)
-    if analysis_type == "extreme_value":
-        if hist_slice is not None:
-            ds_loca = ds_loca - ds_loca.sel(ssp="historical")
-            ds_loca = ds_loca.drop_sel(ssp="historical")
+            ds_star = ds_star.where(ds_star[col_name_main] >= filter_vals[0])
+            ds_star = ds_star.where(ds_star[col_name_main] <= filter_vals[1])
 
-            ds_gard = ds_gard - ds_gard.sel(ssp="historical")
-            ds_gard = ds_gard.drop_sel(ssp="historical")
+        # For the best fit results, future and historical are stored separately
+        # so we need to subtract if change is desired (indicated by hist_slice is not None)
+        if analysis_type == "extreme_value":
+            if hist_slice is not None:
+                ds_loca = ds_loca - ds_loca.sel(ssp="historical")
+                ds_loca = ds_loca.drop_sel(ssp="historical")
 
-            ds_star = ds_star - ds_star.sel(ssp="historical")
-            ds_star = ds_star.drop_sel(ssp="historical")
+                ds_gard = ds_gard - ds_gard.sel(ssp="historical")
+                ds_gard = ds_gard.drop_sel(ssp="historical")
 
-    # Compute GCM uncertainty
-    gcm_uc = compute_gcm_uc(ds_loca, ds_gard, ds_star, col_name_main)
+                ds_star = ds_star - ds_star.sel(ssp="historical")
+                ds_star = ds_star.drop_sel(ssp="historical")
 
-    # Compute SSP uncertainty
-    ssp_uc = compute_ssp_uc(ds_loca, ds_gard, ds_star, col_name_main)
+        # Compute GCM uncertainty
+        gcm_uc = compute_gcm_uc(ds_loca, ds_gard, ds_star, col_name_main)
 
-    ssp_uc_by_gcm = compute_ssp_uc(
-        ds_loca, ds_gard, ds_star, col_name_main, by_gcm=True
-    )
+        # Compute SSP uncertainty
+        ssp_uc = compute_ssp_uc(ds_loca, ds_gard, ds_star, col_name_main)
 
-    # Compute internal variability uncertainty
-    iv_uc = compute_iv_uc(ds_loca, ds_gard, ds_star, col_name_main)
+        ssp_uc_by_gcm = compute_ssp_uc(
+            ds_loca, ds_gard, ds_star, col_name_main, by_gcm=True
+        )
 
-    # Compute downscaling uncertainty
-    dsc_uc = compute_dsc_uc(ds_loca, ds_gard, ds_star, col_name_main)
+        # Compute internal variability uncertainty
+        iv_uc = compute_iv_uc(ds_loca, ds_gard, ds_star, col_name_main)
 
-    # Compute total uncertainty
-    uc_99w_main, uc_95w_main, uc_range_main = compute_tot_uc_main(
-        ds_loca, ds_gard, ds_star, col_name_main
-    )
+        # Compute downscaling uncertainty
+        dsc_uc = compute_dsc_uc(ds_loca, ds_gard, ds_star, col_name_main)
 
-    if not include_fit_uc:
-        fit_uc = xr.zeros_like(uc_99w_main)
-        # uc_99w_boot = xr.zeros_like(uc_99w_main)
+        # Compute total uncertainty
+        uc_99w_main, uc_95w_main, uc_range_main = compute_tot_uc_main(
+            ds_loca, ds_gard, ds_star, col_name_main
+        )
 
-    del ds_loca, ds_star, ds_gard  # memory management
+        del ds_loca, ds_star, ds_gard  # memory management
 
     # Fit uncertainty
     if include_fit_uc:
@@ -998,10 +983,22 @@ def uc_all(
         )
 
         # Compute fit uncertainty
-        fit_uc = compute_fit_uc(ds_loca, ds_gard, ds_star, col_name_boot)
-
-        # # Compute total uncertainty
-        # uc_99w_boot = compute_tot_uc_bootstrap(ds_loca, ds_gard, ds_star, col_name_boot)
+        fit_uc_mean, fit_uc_median = compute_fit_uc(
+            ds_loca, ds_gard, ds_star, col_name_boot
+        )
+        # Store fit uc if desried individually
+        if not include_main_uc:
+            uc = xr.merge(
+                [
+                    fit_uc_mean.rename("fit_uc_mean"),
+                    fit_uc_median.rename("fit_uc_median"),
+                ]
+            )
+            uc.to_netcdf(save_path.replace(".nc", "_fituc.nc"))
+            return None
+    else:
+        fit_uc_mean = xr.zeros_like(uc_99w_main)
+        fit_uc_median = xr.zeros_like(uc_99w_main)
 
     uc = xr.merge(
         [
@@ -1010,18 +1007,19 @@ def uc_all(
             gcm_uc.rename("gcm_uc"),
             iv_uc.rename("iv_uc"),
             dsc_uc.rename("dsc_uc"),
-            fit_uc.rename("fit_uc"),
+            fit_uc_mean.rename("fit_uc_mean"),
+            fit_uc_median.rename("fit_uc_median"),
             uc_99w_main.rename("uc_99w_main"),
             uc_95w_main.rename("uc_95w_main"),
             uc_range_main.rename("uc_range_main"),
-            # uc_99w_boot.rename("uc_99w_boot"),
         ]
     )
 
     if return_metric:
         return uc, ds_loca, ds_star, ds_gard
     else:
-        return uc
+        uc.to_netcdf(save_path)
+        print(f"Saved to {save_path}")
 
 
 def summary_stats_main(
@@ -1032,8 +1030,10 @@ def summary_stats_main(
     stat_name,
     fit_method,
     col_name,
+    col_name_boot,
     proj_slice,
     hist_slice,
+    time_name,
     analysis_type="extreme_value",
     rel=False,
     _preprocess_func=lambda x: x,
@@ -1043,6 +1043,13 @@ def summary_stats_main(
     Calculates summary statistics (mean, median, etc) on the main fit results
     (not accounting for bootstrap).
     """
+    hist_name = f"_{hist_slice}" if hist_slice is not None else ""
+    rel_str = "_rel" if rel else ""
+    save_path = f"{project_data_path}/results/summary_{metric_id}{rel_str}_{proj_slice}_{hist_slice}_{col_name_boot}_{time_name}_{fit_method}_{stat_name}_{grid}grid_{regrid_method}.nc"
+    if os.path.exists(save_path):
+        print(f"File already exists at {save_path}, skipping.")
+        return None
+
     # Read all: main
     ds_loca, ds_star, ds_gard = read_all(
         metric_id=metric_id,
@@ -1097,7 +1104,7 @@ def summary_stats_main(
     ds_gard = ds_gard[col_name]
     ds_star = ds_star[col_name]
 
-    return xr.concat(
+    ds_summary = xr.concat(
         [
             xr.concat(
                 [
@@ -1168,3 +1175,7 @@ def summary_stats_main(
         ],
         dim="ensemble",
     )
+
+    # Store
+    ds_summary.to_netcdf(save_path)
+    print(f"Saved to {save_path}")

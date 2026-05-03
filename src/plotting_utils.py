@@ -8,7 +8,7 @@ import matplotlib.transforms as transforms
 import numpy as np
 import pandas as pd
 import xarray as xr
-from matplotlib.colors import BoundaryNorm, LinearSegmentedColormap, ListedColormap
+from matplotlib.colors import LinearSegmentedColormap
 from matplotlib.lines import Line2D
 
 import sa_city_utils as sacu
@@ -159,21 +159,21 @@ uc_labels = {
     "gcm_uc": "Response uncertainty",
     "iv_uc": "Internal variability",
     "dsc_uc": "Downscaling uncertainty",
-    "fit_uc": "Fit uncertainty",
+    "fit_uc_median": "Fit uncertainty",
 }
 uc_colors = {
     "ssp_uc": "#0077BB",
     "gcm_uc": "#33BBEE",
     "iv_uc": "#009988",
     "dsc_uc": "#EE3377",
-    "fit_uc": "#CC3311",
+    "fit_uc_median": "#CC3311",
 }
 uc_markers = {
     "ssp_uc": "v",
     "gcm_uc": "^",
     "iv_uc": "o",
     "dsc_uc": "D",
-    "fit_uc": "s",
+    "fit_uc_median": "s",
 }
 quantile_labels = {
     "mean": "Mean",
@@ -276,8 +276,8 @@ def plot_uc_map(
     regrid_method="nearest",
     fig=None,
     axs=None,
-    norm="uc_99w_main",
-    total_uc_col="uc_99w_main",
+    norm="uc_95w_main",
+    total_uc_col="uc_95w_main",
     plot_total_uc=True,
     rel_metric_ids=[],
     cbar=False,
@@ -413,10 +413,7 @@ def plot_uc_map(
         rel_str = ""
     # Read
     if analysis_type == "trends":
-        if metric_id == "sum_pr":
-            file_path = f"{project_data_path}/results/{metric_id}{rel_str}_{proj_slice}_{hist_slice}_{plot_col}_{grid}grid_{regrid_method}.nc"
-        else:
-            file_path = f"{project_data_path}/results/{metric_id}{rel_str}_{proj_slice}_{hist_slice}_{plot_col}_{grid}grid_{regrid_method}.nc"
+        file_path = f"{project_data_path}/results/{metric_id}{rel_str}_{proj_slice}_{plot_col}_{proj_slice}_None_None_{grid}grid_{regrid_method}.nc"
     elif analysis_type == "extreme_value":
         if stationary:
             if time_str is not None:
@@ -426,8 +423,8 @@ def plot_uc_map(
         else:
             file_path = f"{project_data_path}/results/{metric_id}_{proj_slice}_{return_period}yr_return_level_{time_str}_{fit_method}_{stat_str}_{grid}grid_{regrid_method}{filter_str}.nc"
     elif analysis_type == "averages":
-        var_id = metric_id.split("_")[1]
-        file_path = f"{project_data_path}/results/{metric_id}_{proj_slice}_{hist_slice}_{var_id}_{grid}grid_{regrid_method}{filter_str}.nc"
+        var_id = metric_id.split('_')[1]
+        file_path = f"{project_data_path}/results/{metric_id}_{proj_slice}_{hist_slice}_{var_id}_None_None_None_{grid}grid_{regrid_method}{filter_str}.nc"
 
     uc = xr.open_dataset(file_path)
 
@@ -439,18 +436,24 @@ def plot_uc_map(
     if norm is None:
         pass
     elif norm == "relative":
-        uc_tot = uc["ssp_uc"] + uc["gcm_uc"] + uc["iv_uc"] + uc["dsc_uc"] + uc["fit_uc"]
+        uc_tot = (
+            uc["ssp_uc"]
+            + uc["gcm_uc"]
+            + uc["iv_uc"]
+            + uc["dsc_uc"]
+            + uc["fit_uc_median"]
+        )
         uc["ssp_uc"] = uc["ssp_uc"] / uc_tot
         uc["gcm_uc"] = uc["gcm_uc"] / uc_tot
         uc["iv_uc"] = uc["iv_uc"] / uc_tot
         uc["dsc_uc"] = uc["dsc_uc"] / uc_tot
-        uc["fit_uc"] = uc["fit_uc"] / uc_tot
+        uc["fit_uc_median"] = uc["fit_uc_median"] / uc_tot
     else:
         uc["ssp_uc"] = uc["ssp_uc"] / uc[norm]
         uc["gcm_uc"] = uc["gcm_uc"] / uc[norm]
         uc["iv_uc"] = uc["iv_uc"] / uc[norm]
         uc["dsc_uc"] = uc["dsc_uc"] / uc[norm]
-        uc["fit_uc"] = uc["fit_uc"] / uc[norm]
+        uc["fit_uc_median"] = uc["fit_uc_median"] / uc[norm]
 
     if axs is None:
         ncols = 4 if analysis_type == "averages" else 6
@@ -540,7 +543,7 @@ def plot_uc_map(
 
     # Loop through uncertainties
     for axi, uc_type in enumerate(list(uc_labels.keys())):
-        if not plot_fit_uc and uc_type == "fit_uc":
+        if not plot_fit_uc and uc_type == "fit_uc_median":
             continue
         ax = axs[axi + axi_start]
         p = (scale_factor * uc[uc_type]).plot(
@@ -658,15 +661,15 @@ def plot_uc_rank_map(
             file_path = f"{project_data_path}/results/{metric_id}{rel_str}_{proj_slice}_{hist_slice}_{plot_col}_{grid}grid_{regrid_method}.nc"
     elif analysis_type == "extreme_value":
         if stationary:
-            if time_str is not None:
-                file_path = f"{project_data_path}/results/{metric_id}_{proj_slice}_{hist_slice}_{return_period}yr_return_level_{time_str}_{fit_method}_{stat_str}_{grid}grid_{regrid_method}{filter_str}.nc"
-            else:
-                file_path = f"{project_data_path}/results/{metric_id}_{proj_slice}_{hist_slice}_{return_period}yr_return_level_{fit_method}_{stat_str}_{grid}grid_{regrid_method}{filter_str}.nc"
+            # if time_str is not None:
+            file_path = f"{project_data_path}/results/{metric_id}_{proj_slice}_{hist_slice}_{return_period}yr_return_level_{time_str}_{fit_method}_{stat_str}_{grid}grid_{regrid_method}{filter_str}.nc"
+            # else:
+            #     file_path = f"{project_data_path}/results/{metric_id}_{proj_slice}_{hist_slice}_{return_period}yr_return_level_{fit_method}_{stat_str}_{grid}grid_{regrid_method}{filter_str}.nc"
         else:
             file_path = f"{project_data_path}/results/{metric_id}_{proj_slice}_{return_period}yr_return_level_{time_str}_{fit_method}_{stat_str}_{grid}grid_{regrid_method}{filter_str}.nc"
     elif analysis_type == "averages":
-        var_id = metric_id.split("_")[1]
-        file_path = f"{project_data_path}/results/{metric_id}_{proj_slice}_{hist_slice}_{var_id}_{grid}grid_{regrid_method}{filter_str}.nc"
+        var_id = metric_id.split('_')[1]
+        file_path = f"{project_data_path}/results/{metric_id}_{proj_slice}_{hist_slice}_{var_id}_None_None_{grid}grid_{regrid_method}{filter_str}.nc"
 
     uc = xr.open_dataset(file_path)
 
@@ -688,17 +691,14 @@ def plot_uc_rank_map(
     # Get ranks
     uc_list = list(uc_labels.keys())
     if not plot_fit_uc:
-        uc_list.remove("fit_uc")
+        uc_list.remove("fit_uc_median")
     uc_ranks = (-uc[uc_list].to_array(dim="uc_type")).rank(dim="uc_type")
     n_ranks = len(uc_list)
-    colors = ["#A8AB50", "#FFE83D", "#A9D3D2", "#24477D", "#5A917C"]
-    cmap = ListedColormap(colors)
-    norm = BoundaryNorm([0.5, 1.5, 2.5, 3.5, 4.5, 5.5], ncolors=5)
     cmap = plt.get_cmap("Set2", n_ranks)
 
     # Loop through uncertainties
     for axi, uc_type in enumerate(uc_list):
-        if not plot_fit_uc and uc_type == "fit_uc":
+        if not plot_fit_uc and uc_type == "fit_uc_median":
             continue
         ax = axs[axi]
         p = uc_ranks.sel(uc_type=uc_type).plot(
@@ -841,7 +841,7 @@ def plot_ensemble_mean_uncertainty(
     time_str,
     analysis_type,
     quantile="mean",
-    total_uc_col="uc_99w_main",
+    total_uc_col="uc_95w_main",
     regrid_method="nearest",
     narrow_subfigs=False,
     fig=None,
@@ -892,12 +892,8 @@ def plot_ensemble_mean_uncertainty(
             rel_str = ""
         # Read
         if analysis_type == "trends":
-            if metric_id == "sum_pr":
-                mean_file_path = f"{project_data_path}/results/summary_{metric_id}{rel_str}_{proj_slice}_{hist_slice}_{plot_col}_{grid}grid_{regrid_method}.nc"
-                uc_file_path = f"{project_data_path}/results/{metric_id}{rel_str}_{proj_slice}_{hist_slice}_{plot_col}_{grid}grid_{regrid_method}.nc"
-            else:
-                mean_file_path = f"{project_data_path}/results/summary_{metric_id}{rel_str}_{proj_slice}_{hist_slice}_{plot_col}_{grid}grid_{regrid_method}.nc"
-                uc_file_path = f"{project_data_path}/results/{metric_id}{rel_str}_{proj_slice}_{hist_slice}_{plot_col}_{grid}grid_{regrid_method}.nc"
+            mean_file_path = f"{project_data_path}/results/summary_{metric_id}{rel_str}_{proj_slice}_{plot_col}_{proj_slice}_None_None_{grid}grid_{regrid_method}.nc"
+            uc_file_path = f"{project_data_path}/results/{metric_id}{rel_str}_{proj_slice}_{plot_col}_{proj_slice}_None_None_{grid}grid_{regrid_method}.nc"
         elif analysis_type == "extreme_value":
             if stationary:
                 if time_str is not None:
@@ -910,9 +906,9 @@ def plot_ensemble_mean_uncertainty(
                 mean_file_path = f"{project_data_path}/results/summary_{metric_id}_{proj_slice}_{return_period}yr_return_level_{time_str}_{fit_method}_{stat_str}_{grid}grid_{regrid_method}{filter_str}.nc"
                 uc_file_path = f"{project_data_path}/results/{metric_id}_{proj_slice}_{return_period}yr_return_level_{time_str}_{fit_method}_{stat_str}_{grid}grid_{regrid_method}{filter_str}.nc"
         elif analysis_type == "averages":
-            var_id = metric_id.split("_")[1]
-            mean_file_path = f"{project_data_path}/results/summary_{metric_id}_{proj_slice}_{hist_slice}_{var_id}_{grid}grid_{regrid_method}{filter_str}.nc"
-            uc_file_path = f"{project_data_path}/results/{metric_id}_{proj_slice}_{hist_slice}_{var_id}_{grid}grid_{regrid_method}{filter_str}.nc"
+            var_id = metric_id.split('_')[1]
+            mean_file_path = f"{project_data_path}/results/summary_{metric_id}_{proj_slice}_{hist_slice}_{var_id}_None_None_None_{grid}grid_{regrid_method}{filter_str}.nc"
+            uc_file_path = f"{project_data_path}/results/{metric_id}_{proj_slice}_{hist_slice}_{var_id}_None_None_None_{grid}grid_{regrid_method}{filter_str}.nc"
 
         ds_mean = xr.open_dataset(mean_file_path)
         ds_uc = xr.open_dataset(uc_file_path)
@@ -955,7 +951,7 @@ def plot_ensemble_mean_uncertainty(
             if metric_id in ["max_pr", "sum_pr"]:
                 cmap = devon_map
             else:
-                # cmap = "Blues_r" if "min" in metric_id else lajolla_map
+                # cmap = "Blues_r" if ("min" in metric_id and analysis) else lajolla_map
                 cmap = lajolla_map
 
         # Cbar label
@@ -1065,10 +1061,7 @@ def plot_ensemble_ssp_means(
         rel_str = ""
     # Read
     if analysis_type == "trends":
-        if metric_id == "sum_pr":
-            file_path = f"{project_data_path}/results/summary_{metric_id}{rel_str}_{proj_slice}_{hist_slice}_{plot_col}_{grid}grid_{regrid_method}.nc"
-        else:
-            file_path = f"{project_data_path}/results/summary_{metric_id}{rel_str}_{proj_slice}_{hist_slice}_{plot_col}_{grid}grid_{regrid_method}.nc"
+        file_path = f"{project_data_path}/results/summary_{metric_id}{rel_str}_{proj_slice}_{plot_col}_{proj_slice}_None_None_{grid}grid_{regrid_method}.nc"
     elif analysis_type == "extreme_value":
         if stationary:
             if time_str is not None:
@@ -1078,7 +1071,8 @@ def plot_ensemble_ssp_means(
         else:
             file_path = f"{project_data_path}/results/summary_{metric_id}_{proj_slice}_{return_period}yr_return_level_{time_str}_{fit_method}_{stat_str}_{grid}grid_{regrid_method}{filter_str}.nc"
     elif analysis_type == "averages":
-        file_path = f"{project_data_path}/results/summary_{metric_id}_{proj_slice}_{hist_slice}_{grid}grid_{regrid_method}{filter_str}.nc"
+        var_id = metric_id.split('_')[1]
+        file_path = f"{project_data_path}/results/{metric_id}_{proj_slice}_{hist_slice}_{var_id}_None_None_None_{grid}grid_{regrid_method}{filter_str}.nc"
 
     ds = xr.open_dataset(file_path)
 
@@ -1122,8 +1116,12 @@ def plot_ensemble_ssp_means(
         if metric_id in ["max_pr", "sum_pr"]:
             cmap = devon_map
         else:
-            # cmap = "Blues_r" if "min" in metric_id else lajolla_map
-            cmap = lajolla_map
+            cmap = (
+                "Blues_r"
+                if ("min" in metric_id and time_str in ["2075", "proj"])
+                else lajolla_map
+            )
+            # cmap = lajolla_map
 
     # Loop through quantiles
     for idq, quantile in enumerate(["q01", "mean", "q99"]):
@@ -1245,7 +1243,7 @@ def plot_ensemble_mean_uq(
     time_str=None,
     rel_metric_ids=[],
     grid="LOCA2",
-    norm="uc_99w_main",
+    norm="uc_95w_main",
     vmax_uc=50,
     plot_fit_uc=True,
     figsize=(12, 7.5),
@@ -1278,6 +1276,7 @@ def plot_ensemble_mean_uq(
         stationary=stationary,
         stat_str=stat_str,
         time_str=time_str,
+        total_uc_col=norm,
         rel_metric_ids=rel_metric_ids,
         analysis_type=analysis_type,
         fig=subfigs[0],
@@ -1363,7 +1362,7 @@ def plot_ensemble_ssp_means_uncertainty(
     time_str=None,
     rel_metric_ids=[],
     grid="LOCA2",
-    norm="uc_99w_main",
+    norm="uc_95w_main",
     vmax_uc=50,
     y_title=1.08,
     figsize=(12, 6),
@@ -1925,7 +1924,7 @@ def plot_uc_rls(
     stat_str,
     grid="LOCA2",
     regrid_method="nearest",
-    total_uc="uc_99w_main",
+    total_uc="uc_95w_main",
     plot_total_uc=False,
     return_periods=[10, 25, 50, 100],
     metric_ids=gev_metric_ids[:3],
@@ -1951,7 +1950,7 @@ def plot_uc_rls(
             1,
             len(metric_ids),
             figsize=(3.5 * len(metric_ids), 4.5),
-            sharey=True,
+            sharey=False,
             gridspec_kw={"wspace": 0.1},
             layout="constrained",
         )
@@ -1976,15 +1975,11 @@ def plot_uc_rls(
 
         # Ready for plot
         if coord_or_mean == "mean":
-            df = ds.mean(dim=["lat", "lon"]).to_dataframe().droplevel("quantile")
+            df = ds.mean(dim=["lat", "lon"]).to_dataframe()
         else:
-            df = (
-                ds.sel(
-                    lat=coord_or_mean[0], lon=360 + coord_or_mean[1], method="nearest"
-                )
-                .to_dataframe()
-                .droplevel("quantile")
-            )
+            df = ds.sel(
+                lat=coord_or_mean[0], lon=360 + coord_or_mean[1], method="nearest"
+            ).to_dataframe()
         df_total_uc = df[total_uc]
 
         # Plot total UC first with lower alpha
@@ -2001,7 +1996,7 @@ def plot_uc_rls(
         # Plot UC components on top with higher alpha
         ax = axs[idm] if isinstance(axs, list) else axs
         for uc_type in uc_labels:
-            if not plot_fit_uc and uc_type == "fit_uc":
+            if not plot_fit_uc and uc_type == "fit_uc_median":
                 continue
             ax.plot(
                 df.index,
@@ -2018,12 +2013,12 @@ def plot_uc_rls(
                 color=uc_colors[uc_type],
                 alpha=0.9,
             )
+        if ylim is not None:
+            ax.set_ylim(ylim)
 
         # Tidy
         ax.grid(alpha=0.5)
         ax.set_xticks(return_periods)
-        if ylim is not None:
-            ax.set_ylim(ylim)
         if ax_title:
             title_str = title_labels[metric_id]
             ax.set_title(
@@ -2161,13 +2156,13 @@ def plot_response_rls(
             df.stack().rename("return_level").rename_axis(["quantile", "return_period"])
         ).sort_index()
 
-        # Plot mean and 99% range
+        # Plot mean and 95% range
         ax = axs[idm] if isinstance(axs, list) else axs
         ax.plot(return_periods, df_plot.loc["mean"], color="white")
         ax.fill_between(
             return_periods,
-            y1=df_plot.loc["q01"]["return_level"],
-            y2=df_plot.loc["q99"]["return_level"],
+            y1=df_plot.loc["q025"]["return_level"],
+            y2=df_plot.loc["q975"]["return_level"],
             alpha=0.9,
             color="gray",
         )

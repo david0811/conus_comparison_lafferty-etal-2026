@@ -47,10 +47,10 @@ def plot_total_uncertainty(
     df.groupby("time").mean(numeric_only=True).plot(y=var_id, lw=2, color="gray", ax=ax)
 
     # Plot quantiles
-    df.groupby("time").quantile(0.995, numeric_only=True).plot(
+    df.groupby("time").quantile(0.975, numeric_only=True).plot(
         y=var_id, lw=1, color="gray", ax=ax, ls="--"
     )
-    df.groupby("time").quantile(0.005, numeric_only=True).plot(
+    df.groupby("time").quantile(0.025, numeric_only=True).plot(
         y=var_id, lw=1, color="gray", ax=ax, ls="--"
     )
 
@@ -70,14 +70,14 @@ def plot_total_uncertainty(
 
     # Legend
     legend_elements = [
-        Line2D([0], [0], color="gray", lw=1, ls="--", label="99% range"),
+        Line2D([0], [0], color="gray", lw=1, ls="--", label="95% range"),
         Line2D([0], [0], color="gray", lw=2, label="Ensemble mean"),
     ]
     ax.legend(handles=legend_elements, loc="upper left")
 
     # Add index of uncertainty
-    y1 = df.groupby("time").quantile(0.995, numeric_only=True)[var_id].iloc[-1]
-    y2 = df.groupby("time").quantile(0.005, numeric_only=True)[var_id].iloc[-1]
+    y1 = df.groupby("time").quantile(0.975, numeric_only=True)[var_id].iloc[-1]
+    y2 = df.groupby("time").quantile(0.025, numeric_only=True)[var_id].iloc[-1]
 
     ax.annotate(
         "",

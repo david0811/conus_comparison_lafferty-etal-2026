@@ -371,7 +371,8 @@ def calculate_df_uc(df, plot_col, n_min_members=5):
 
     # Range functions
     def get_range(x):
-        return x.max() - x.min()
+        # return x.max() - x.min()
+        return np.quantile(x, 0.975) - np.quantile(x, 0.025)
 
     def get_quantile_range(df, groupby_cols, plot_col):
         df_tmp = pd.merge(
@@ -460,21 +461,15 @@ def calculate_df_uc(df, plot_col, n_min_members=5):
     # Total uncertainty
     if "n_boot" in df.columns:
         df_samples = df[df["n_boot"] != "main"]
-        uc_99w_boot = df_samples[plot_col].quantile(0.995) - df_samples[
-            plot_col
-        ].quantile(0.005)
-        uc_99w_main = df_main[plot_col].quantile(0.995) - df_main[plot_col].quantile(
-            0.005
-        )
+        uc_99w_boot = df_samples[plot_col].quantile(0.975) - df_samples[plot_col].quantile(0.025)
+        uc_99w_main = df_main[plot_col].quantile(0.995) - df_main[plot_col].quantile(0.005)
     elif "quantile" in df.columns:
         upper = df[df["quantile"] == "q975"][plot_col].quantile(0.995)
         lower = df[df["quantile"] == "q025"][plot_col].quantile(0.005)
         uc_99w_boot = upper - lower
-        uc_99w_main = df_main[plot_col].quantile(0.995) - df_main[plot_col].quantile(
-            0.005
-        )
+        uc_99w_main = df_main[plot_col].quantile(0.975) - df_main[plot_col].quantile(0.025)
     else:
-        uc_99w_main = df[plot_col].quantile(0.995) - df[plot_col].quantile(0.005)
+        uc_99w_main = df[plot_col].quantile(0.975) - df[plot_col].quantile(0.025)
         uc_99w_boot = np.nan
 
     # Fit uncertainty if included
