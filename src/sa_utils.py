@@ -14,7 +14,7 @@ def read_loca(
     regrid_method,
     proj_slice,
     hist_slice,
-    stationary,
+    stationary
     stat_name,
     fit_method,
     bootstrap,
@@ -1043,9 +1043,9 @@ def summary_stats_main(
     Calculates summary statistics (mean, median, etc) on the main fit results
     (not accounting for bootstrap).
     """
-    hist_name = f"_{hist_slice}" if hist_slice is not None else ""
     rel_str = "_rel" if rel else ""
     save_path = f"{project_data_path}/results/summary_{metric_id}{rel_str}_{proj_slice}_{hist_slice}_{col_name_boot}_{time_name}_{fit_method}_{stat_name}_{grid}grid_{regrid_method}.nc"
+
     if os.path.exists(save_path):
         print(f"File already exists at {save_path}, skipping.")
         return None
@@ -1108,7 +1108,9 @@ def summary_stats_main(
         [
             xr.concat(
                 [
-                    ds_loca.mean(dim=["gcm", "member"]).assign_coords(quantile="mean"),
+                    ds_loca.mean(dim="member")
+                    .mean(dim="gcm")
+                    .assign_coords(quantile="mean"),
                     xrcompat.xr_apply_nanquantile(
                         ds_loca, q=0.5, dim=["gcm", "member"]
                     ).assign_coords(quantile="median"),
@@ -1130,7 +1132,9 @@ def summary_stats_main(
             ),
             xr.concat(
                 [
-                    ds_gard.mean(dim=["gcm", "member"]).assign_coords(quantile="mean"),
+                    ds_gard.mean(dim="member")
+                    .mean(dim="gcm")
+                    .assign_coords(quantile="mean"),
                     xrcompat.xr_apply_nanquantile(
                         ds_gard, q=0.5, dim=["gcm", "member"]
                     ).assign_coords(quantile="median"),
@@ -1153,9 +1157,9 @@ def summary_stats_main(
             xr.concat(
                 [
                     ds_star.mean(dim=["gcm", "member"]).assign_coords(quantile="mean"),
-                    ds_star.median(dim=["gcm", "member"]).assign_coords(
-                        quantile="median"
-                    ),
+                    xrcompat.xr_apply_nanquantile(
+                        ds_star, q=0.5, dim=["gcm", "member"]
+                    ).assign_coords(quantile="median"),
                     xrcompat.xr_apply_nanquantile(
                         ds_star, q=0.01, dim=["gcm", "member"]
                     ).assign_coords(quantile="q01"),

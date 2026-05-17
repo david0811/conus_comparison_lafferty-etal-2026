@@ -159,21 +159,21 @@ uc_labels = {
     "gcm_uc": "Response uncertainty",
     "iv_uc": "Internal variability",
     "dsc_uc": "Downscaling uncertainty",
-    "fit_uc_median": "Fit uncertainty",
+    "fit_uc_mean": "Fit uncertainty",
 }
 uc_colors = {
     "ssp_uc": "#0077BB",
     "gcm_uc": "#33BBEE",
     "iv_uc": "#009988",
     "dsc_uc": "#EE3377",
-    "fit_uc_median": "#CC3311",
+    "fit_uc_mean": "#CC3311",
 }
 uc_markers = {
     "ssp_uc": "v",
     "gcm_uc": "^",
     "iv_uc": "o",
     "dsc_uc": "D",
-    "fit_uc_median": "s",
+    "fit_uc_mean": "s",
 }
 quantile_labels = {
     "mean": "Mean",
@@ -423,7 +423,7 @@ def plot_uc_map(
         else:
             file_path = f"{project_data_path}/results/{metric_id}_{proj_slice}_{return_period}yr_return_level_{time_str}_{fit_method}_{stat_str}_{grid}grid_{regrid_method}{filter_str}.nc"
     elif analysis_type == "averages":
-        var_id = metric_id.split('_')[1]
+        var_id = metric_id.split("_")[1]
         file_path = f"{project_data_path}/results/{metric_id}_{proj_slice}_{hist_slice}_{var_id}_None_None_None_{grid}grid_{regrid_method}{filter_str}.nc"
 
     uc = xr.open_dataset(file_path)
@@ -441,19 +441,19 @@ def plot_uc_map(
             + uc["gcm_uc"]
             + uc["iv_uc"]
             + uc["dsc_uc"]
-            + uc["fit_uc_median"]
+            + uc["fit_uc_mean"]
         )
         uc["ssp_uc"] = uc["ssp_uc"] / uc_tot
         uc["gcm_uc"] = uc["gcm_uc"] / uc_tot
         uc["iv_uc"] = uc["iv_uc"] / uc_tot
         uc["dsc_uc"] = uc["dsc_uc"] / uc_tot
-        uc["fit_uc_median"] = uc["fit_uc_median"] / uc_tot
+        uc["fit_uc_mean"] = uc["fit_uc_mean"] / uc_tot
     else:
         uc["ssp_uc"] = uc["ssp_uc"] / uc[norm]
         uc["gcm_uc"] = uc["gcm_uc"] / uc[norm]
         uc["iv_uc"] = uc["iv_uc"] / uc[norm]
         uc["dsc_uc"] = uc["dsc_uc"] / uc[norm]
-        uc["fit_uc_median"] = uc["fit_uc_median"] / uc[norm]
+        uc["fit_uc_mean"] = uc["fit_uc_mean"] / uc[norm]
 
     if axs is None:
         ncols = 4 if analysis_type == "averages" else 6
@@ -543,7 +543,7 @@ def plot_uc_map(
 
     # Loop through uncertainties
     for axi, uc_type in enumerate(list(uc_labels.keys())):
-        if not plot_fit_uc and uc_type == "fit_uc_median":
+        if not plot_fit_uc and uc_type == "fit_uc_mean":
             continue
         ax = axs[axi + axi_start]
         p = (scale_factor * uc[uc_type]).plot(
@@ -668,7 +668,7 @@ def plot_uc_rank_map(
         else:
             file_path = f"{project_data_path}/results/{metric_id}_{proj_slice}_{return_period}yr_return_level_{time_str}_{fit_method}_{stat_str}_{grid}grid_{regrid_method}{filter_str}.nc"
     elif analysis_type == "averages":
-        var_id = metric_id.split('_')[1]
+        var_id = metric_id.split("_")[1]
         file_path = f"{project_data_path}/results/{metric_id}_{proj_slice}_{hist_slice}_{var_id}_None_None_{grid}grid_{regrid_method}{filter_str}.nc"
 
     uc = xr.open_dataset(file_path)
@@ -691,14 +691,14 @@ def plot_uc_rank_map(
     # Get ranks
     uc_list = list(uc_labels.keys())
     if not plot_fit_uc:
-        uc_list.remove("fit_uc_median")
+        uc_list.remove("fit_uc_mean")
     uc_ranks = (-uc[uc_list].to_array(dim="uc_type")).rank(dim="uc_type")
     n_ranks = len(uc_list)
     cmap = plt.get_cmap("Set2", n_ranks)
 
     # Loop through uncertainties
     for axi, uc_type in enumerate(uc_list):
-        if not plot_fit_uc and uc_type == "fit_uc_median":
+        if not plot_fit_uc and uc_type == "fit_uc_mean":
             continue
         ax = axs[axi]
         p = uc_ranks.sel(uc_type=uc_type).plot(
@@ -892,7 +892,7 @@ def plot_ensemble_mean_uncertainty(
             rel_str = ""
         # Read
         if analysis_type == "trends":
-            mean_file_path = f"{project_data_path}/results/summary_{metric_id}{rel_str}_{proj_slice}_{plot_col}_{proj_slice}_None_None_{grid}grid_{regrid_method}.nc"
+            mean_file_path = f"{project_data_path}/results/summary_{metric_id}{rel_str}_{proj_slice}_None_{plot_col}_{proj_slice}_None_None_{grid}grid_{regrid_method}.nc"
             uc_file_path = f"{project_data_path}/results/{metric_id}{rel_str}_{proj_slice}_{plot_col}_{proj_slice}_None_None_{grid}grid_{regrid_method}.nc"
         elif analysis_type == "extreme_value":
             if stationary:
@@ -906,7 +906,7 @@ def plot_ensemble_mean_uncertainty(
                 mean_file_path = f"{project_data_path}/results/summary_{metric_id}_{proj_slice}_{return_period}yr_return_level_{time_str}_{fit_method}_{stat_str}_{grid}grid_{regrid_method}{filter_str}.nc"
                 uc_file_path = f"{project_data_path}/results/{metric_id}_{proj_slice}_{return_period}yr_return_level_{time_str}_{fit_method}_{stat_str}_{grid}grid_{regrid_method}{filter_str}.nc"
         elif analysis_type == "averages":
-            var_id = metric_id.split('_')[1]
+            var_id = metric_id.split("_")[1]
             mean_file_path = f"{project_data_path}/results/summary_{metric_id}_{proj_slice}_{hist_slice}_{var_id}_None_None_None_{grid}grid_{regrid_method}{filter_str}.nc"
             uc_file_path = f"{project_data_path}/results/{metric_id}_{proj_slice}_{hist_slice}_{var_id}_None_None_None_{grid}grid_{regrid_method}{filter_str}.nc"
 
@@ -1071,7 +1071,7 @@ def plot_ensemble_ssp_means(
         else:
             file_path = f"{project_data_path}/results/summary_{metric_id}_{proj_slice}_{return_period}yr_return_level_{time_str}_{fit_method}_{stat_str}_{grid}grid_{regrid_method}{filter_str}.nc"
     elif analysis_type == "averages":
-        var_id = metric_id.split('_')[1]
+        var_id = metric_id.split("_")[1]
         file_path = f"{project_data_path}/results/{metric_id}_{proj_slice}_{hist_slice}_{var_id}_None_None_None_{grid}grid_{regrid_method}{filter_str}.nc"
 
     ds = xr.open_dataset(file_path)
@@ -1996,7 +1996,7 @@ def plot_uc_rls(
         # Plot UC components on top with higher alpha
         ax = axs[idm] if isinstance(axs, list) else axs
         for uc_type in uc_labels:
-            if not plot_fit_uc and uc_type == "fit_uc_median":
+            if not plot_fit_uc and uc_type == "fit_uc_mean":
                 continue
             ax.plot(
                 df.index,
