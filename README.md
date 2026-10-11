@@ -63,5 +63,6 @@ The following scripts can then be used to reproduce the experiment:
 | 04b_si_plots.ipynb | Creates some supplementary figures. |
 | 04c_si_city_checks.ipynb | Creates some supplementary figures, focused on select locations. |
 | 05_gev_evals.ipynb | Performs the GEV fit evaluations. |
+| 08_conditional_uc_city.py | Plots 'conditional' uncertainty analyses for select city, showing how the uncertainty estimates vary by SSP/GCM/downscaling. |
 | 99_additional_checks.ipynb | Additional validation and quality control checks. |
 | 99_misc_figs.ipynb | Other figs, used in presentations. |

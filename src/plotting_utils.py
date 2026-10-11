@@ -436,13 +436,16 @@ def plot_uc_map(
     if norm is None:
         pass
     elif norm == "relative":
-        uc_tot = (
-            uc["ssp_uc"]
-            + uc["gcm_uc"]
-            + uc["iv_uc"]
-            + uc["dsc_uc"]
-            + uc["fit_uc_mean"]
-        )
+        if analysis_type == "extreme_value":
+            uc_tot = (
+                uc["ssp_uc"]
+                + uc["gcm_uc"]
+                + uc["iv_uc"]
+                + uc["dsc_uc"]
+                + uc["fit_uc_mean"]
+            )
+        else:
+            uc_tot = uc["ssp_uc"] + uc["gcm_uc"] + uc["iv_uc"] + uc["dsc_uc"]
         uc["ssp_uc"] = uc["ssp_uc"] / uc_tot
         uc["gcm_uc"] = uc["gcm_uc"] / uc_tot
         uc["iv_uc"] = uc["iv_uc"] / uc_tot
@@ -1243,6 +1246,7 @@ def plot_ensemble_mean_uq(
     time_str=None,
     rel_metric_ids=[],
     grid="LOCA2",
+    total_uc_col="uc_95w_main",
     norm="uc_95w_main",
     vmax_uc=50,
     plot_fit_uc=True,
@@ -1276,7 +1280,7 @@ def plot_ensemble_mean_uq(
         stationary=stationary,
         stat_str=stat_str,
         time_str=time_str,
-        total_uc_col=norm,
+        total_uc_col=total_uc_col,
         rel_metric_ids=rel_metric_ids,
         analysis_type=analysis_type,
         fig=subfigs[0],
@@ -1324,7 +1328,6 @@ def plot_ensemble_mean_uq(
             y_title=b_y_titles,
             title=subplot_labels[idp],
             fig=b_subfigs[idp],
-            # axs=axs[1:-1] if len(plot_metric_ids) == 3 else axs,
             axs=axs,
             plot_fit_uc=plot_fit_uc,
             plot_total_uc=False,
@@ -1339,7 +1342,11 @@ def plot_ensemble_mean_uq(
     # Create a new axes for the colorbar at the bottom
     cbar_ax = subfigs[1].add_axes(cbar_ax)  # [left, bottom, width, height]
     cbar = subfigs[1].colorbar(p, cax=cbar_ax, orientation="horizontal")
-    cbar.set_label("Fraction of total uncertainty [%]")
+    cbar_labels = {
+        "uc_95w_main": "Fraction of total uncertainty [%]",
+        "relative": "Relative uncertainty [%]",
+    }
+    cbar.set_label(cbar_labels[norm])
 
     if store_path is not None:
         fig.savefig(store_path, dpi=400, bbox_inches="tight")
@@ -1925,6 +1932,7 @@ def plot_uc_rls(
     grid="LOCA2",
     regrid_method="nearest",
     total_uc="uc_95w_main",
+    norm="relative",
     plot_total_uc=False,
     return_periods=[10, 25, 50, 100],
     metric_ids=gev_metric_ids[:3],
@@ -1995,19 +2003,25 @@ def plot_uc_rls(
 
         # Plot UC components on top with higher alpha
         ax = axs[idm] if isinstance(axs, list) else axs
+
+        if norm == "relative":
+            df["relative"] = 0.0
+            for uc_type in uc_labels:
+                df["relative"] += df[uc_type]
+
         for uc_type in uc_labels:
             if not plot_fit_uc and uc_type == "fit_uc_mean":
                 continue
             ax.plot(
                 df.index,
-                df[uc_type] / df[total_uc] * 100,
+                df[uc_type] / df[norm] * 100,
                 lw=2,
                 color=uc_colors[uc_type],
                 alpha=0.9,
             )
             ax.scatter(
                 df.index,
-                df[uc_type] / df[total_uc] * 100,
+                df[uc_type] / df[norm] * 100,
                 s=50,
                 marker=uc_markers[uc_type],
                 color=uc_colors[uc_type],
@@ -2032,7 +2046,12 @@ def plot_uc_rls(
             ax.set_xticklabels([])
 
         # Tidy
-        ax.set_ylabel("Relative contribution [%]", fontsize=fontsize)
+        ylabel = (
+            "Relative uncertainty [%]"
+            if norm == "relative"
+            else "Relative contribution [%]"
+        )
+        ax.set_ylabel(ylabel, fontsize=fontsize)
         ax.yaxis.set_major_locator(mticker.MaxNLocator(integer=True))
 
     # Add legend below bottom row

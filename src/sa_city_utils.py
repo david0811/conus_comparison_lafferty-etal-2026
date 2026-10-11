@@ -518,6 +518,97 @@ def calculate_df_uc(df, plot_col, n_min_members=5):
     )
 
 
+#######################
+# Conditional UC for city df
+#######################
+def calculate_uc_groups(df, plot_col, n_min_members=5):
+    """
+    Group-level uncertainty estimates underlying `calculate_df_uc`, kept
+    separate (rather than averaged) so they can be conditioned on any factor.
+
+    Uses the same definitions as `calculate_df_uc` (95% quantile ranges of the
+    "main" fits) and returns a long DataFrame with columns
+    [uc_type, ensemble, gcm, ssp, value]. Factors that an uncertainty marginalises
+    over are set to "-" (e.g. downscaling uncertainty has ensemble "-"), and
+    groups with zero range (a single contributor) are dropped.
+    """
+    if "STAR-ESDM" in df["ensemble"].unique():
+        df = df[df["member"] != "TaiESM1"]
+
+    def get_range(x):
+        return np.quantile(x, 0.975) - np.quantile(x, 0.025)
+
+    df_main = df[df["n_boot"] == "main"]
+    df_boot = df[df["n_boot"] != "main"]
+
+    combos = ["ensemble", "gcm", "ssp"]
+    n_members = df_main.groupby(combos)[plot_col].count()
+    included = n_members >= n_min_members
+    means = df_main.groupby(combos)[plot_col].mean()
+
+    def to_long(s, uc_type):
+        s = s.rename("value").replace(0.0, np.nan).dropna().reset_index()
+        s["uc_type"] = uc_type
+        for col in combos:
+            if col not in s.columns:
+                s[col] = "-"
+        return s[["uc_type", *combos, "value"]]
+
+    out = [
+        # Scenario: range over SSPs, per ensemble (all GCMs pooled) or per ensemble-GCM
+        to_long(
+            df_main.groupby(["ensemble", "ssp"])[plot_col]
+            .mean()
+            .groupby("ensemble")
+            .apply(get_range),
+            "ssp_uc",
+        ),
+        to_long(
+            means.loc[included].groupby(["ensemble", "gcm"]).apply(get_range),
+            "ssp_uc_by_gcm",
+        ),
+        # Response: range over GCM means, per ensemble-SSP
+        to_long(
+            means.loc[included].groupby(["ensemble", "ssp"]).apply(get_range),
+            "gcm_uc",
+        ),
+        # Internal variability: range over members, per ensemble-GCM-SSP
+        to_long(
+            df_main.groupby(combos)[plot_col].apply(get_range).loc[included], "iv_uc"
+        ),
+        # Downscaling: range over ensembles, per GCM-SSP-member (so no ensemble)
+        to_long(
+            df_main.groupby(["gcm", "ssp", "member"])[plot_col].apply(get_range),
+            "dsc_uc",
+        ),
+    ]
+
+    # Fit: bootstrap range, per simulation
+    fit = df_boot.groupby(combos + ["member"])[plot_col].apply(get_range)
+    out.append(to_long(fit, "fit_uc"))
+
+    return pd.concat(out, ignore_index=True)
+
+
+def summarise_uc_groups(df_groups, by=None):
+    """
+    Mean and std (over the group-level estimates) of each uncertainty type,
+    conditional on the levels of `by` ("ensemble", "gcm" or "ssp"; None for no
+    conditioning). Uncertainties that marginalise over `by` are absent.
+    """
+    if by is None:
+        df_groups = df_groups.assign(level="All")
+        by = "level"
+    else:
+        df_groups = df_groups[df_groups[by] != "-"]
+    return (
+        df_groups.groupby(["uc_type", by])["value"]
+        .agg(["mean", "std", "count"])
+        .reset_index()
+        .rename(columns={by: "level"})
+    )
+
+
 # #################################
 # # Store all city GEV results
 # #################################

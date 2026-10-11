@@ -33,6 +33,7 @@ dependencies = [
     "salem>=0.3.11",
     "bottleneck>=1.6.0",
     "fastnanquantile>=0.0.2",
+    "jupytext>=1.19.6",
 ]
 
 [tool.ruff]
